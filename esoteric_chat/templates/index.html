@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Esoteric Chat</title>
+  <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      {% if config.BACK_LINK %}<a class="back" href="{{ config.BACK_LINK.href }}">&larr; {{ config.BACK_LINK.label }}</a>{% endif %}
+      <h1>Esoteric Chat</h1>
+      <p class="subtitle">Pick a language and send code, or type <code>$help</code> for commands.</p>
+    </header>
+
+    <main id="log" class="log" aria-live="polite"></main>
+
+    <form id="composer" class="composer">
+      <div class="composer-row toolbar">
+        <label class="sr-only" for="language">Language</label>
+        <select id="language"></select>
+        <button type="button" id="example" class="secondary">Try example</button>
+        <button type="button" id="commands" class="secondary">Commands</button>
+        <a id="explained" class="button secondary" target="_blank" rel="noopener noreferrer">Language Explained</a>
+      </div>
+      <div class="composer-row">
+        <label class="sr-only" for="message">Message</label>
+        <textarea id="message" rows="2" placeholder="Enter code or a $command. Enter to send, Shift+Enter for a new line." autocomplete="off" spellcheck="false"></textarea>
+        <button type="submit" id="send">Send</button>
+      </div>
+    </form>
+  </div>
+  <script src="static/app.js"></script>
+</body>
+</html>
