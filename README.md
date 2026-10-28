@@ -28,29 +28,29 @@ docker run -d -p 5000:5000 esoteric-chat
 ## Using the chat
 
 - Pick a language from the dropdown, type code, and press **Enter** (Shift+Enter adds a new line).
-  **Try example** fills in a sample program for the selected language, **Commands** shows the language's
+  **Try example** lists sample programs for the selected language and fills in the one you pick, **Commands** shows the language's
   valid characters, and **Language Explained** opens its esolangs.org page.
-- Messages starting with `$` are commands and run regardless of the selected language.
+- Messages starting with `$` are commands and run regardless of the selected language, except Kallisti: with
+  Kallisti selected, every message is repeated back exactly, `$` included.
+- Everything after the command name and one space (or new line) is passed on exactly as typed.
 
 | Command | Description |
 | --- | --- |
 | `$ping` | Returns pong in Brainfart |
 | `$hi` / `$hello` | Returns hello in Brainfart |
-| `$bf <code>` | Brainfart |
-| `$kallisti <code>` | Kallisti |
-| `$unnecessary <code>` | Unnecessary |
-| `$hq9plus <code>` | HQ9+ |
-| `$hatemath <code>` | Hatemath |
-| `$deadsimple <code>` | DeadSimple |
 | `$fivecommand <code>` | 5command |
-| `$debugfivecommand <code>` | 5command with a debug log |
-| `$help` / `$help <command>` | Help, or details about one language |
+| `$bf <code>` | Brainfart |
+| `$deadsimple <code>` | DeadSimple |
+| `$hatemath <code>` | Hatemath |
+| `$hq9plus <code>` | HQ9+ |
+| `$kallisti <code>` | Kallisti |
+| `$unnecessary <code>` | Unnecessary (an empty program or `#` is a successful call) |
 
 ## API
 
-- `GET /api/languages` returns `{"languages": [{"id", "name", "example", "intro", "info_url", "help"}]}`, where `intro` is shown when
-  the language is selected (or `null`) and `help`
-  is the same card `$help <id>` returns
+- `GET /api/languages` returns `{"languages": [{"id", "name", "examples", "intro", "info_url", "help"}]}` in picker
+  order; the first is selected on load. `examples` is a list of `{"label", "code"}`, `intro` is shown when the
+  language is selected (or `null`), and `help` is the card the **Commands** button shows.
 - `POST /api/chat` with `{"message": "...", "language": "bf"}` returns `{"replies": [...]}`. Each reply is
   `{"type": "text" | "error", "text"}` or `{"type": "help", "title", "color", "fields": [{"name", "value"}]}`.
 
@@ -80,3 +80,5 @@ tests/                          pytest suite
 - HQ9+ accepts upper- and lowercase commands, and the `+` accumulator is kept in memory per server process
   instead of in `index.json`.
 - `$close` was dropped because there is no bot connection to close.
+- Kallisti reverses each message, swaps its upper and lower case and shifts every letter 5 places, then undoes
+  all three, so the message still comes back exactly as sent.

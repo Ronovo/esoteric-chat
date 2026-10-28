@@ -3,7 +3,7 @@ const form = document.getElementById("composer");
 const languageSelect = document.getElementById("language");
 const messageInput = document.getElementById("message");
 const sendButton = document.getElementById("send");
-const exampleButton = document.getElementById("example");
+const exampleSelect = document.getElementById("example");
 const commandsButton = document.getElementById("commands");
 const explainedLink = document.getElementById("explained");
 
@@ -18,14 +18,15 @@ function updateExplainedLink() {
   if (lang) explainedLink.href = lang.info_url;
 }
 
+function updateExamples() {
+  const lang = selectedLanguage();
+  exampleSelect.replaceChildren(new Option("Try example", ""));
+  if (lang) lang.examples.forEach((example, i) => exampleSelect.append(new Option(example.label, i)));
+}
+
 function showIntro() {
   const lang = selectedLanguage();
   if (lang && lang.intro) addMessage("bot", "Esoteric Chat", bubble(lang.intro));
-}
-
-function languageName(id) {
-  const lang = languages.find((l) => l.id === id);
-  return lang ? lang.name : id;
 }
 
 function addMessage(role, metaText, content) {
@@ -89,8 +90,9 @@ function renderReply(reply) {
 
 async function send(message) {
   const language = languageSelect.value;
-  const isCommand = message.trim().startsWith("$");
-  addMessage("user", isCommand ? "command" : languageName(language), bubble(message));
+  const lang = selectedLanguage();
+  const isCommand = message.trim().startsWith("$") && language !== "kallisti";
+  addMessage("user", isCommand ? "command" : lang ? lang.name : language, bubble(message));
   sendButton.disabled = true;
   try {
     const res = await fetch("api/chat", {
@@ -98,9 +100,9 @@ async function send(message) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, language }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      addMessage("bot", "Esoteric Chat", bubble(data.error || "Request failed", "error"));
+      addMessage("bot", "Esoteric Chat", bubble(data.error || "Request failed (" + res.status + ")", "error"));
       return;
     }
     data.replies.forEach((reply) => addMessage("bot", "Esoteric Chat", renderReply(reply)));
@@ -114,6 +116,7 @@ async function send(message) {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (sendButton.disabled) return;
   const message = messageInput.value;
   if (!message.trim()) return;
   messageInput.value = "";
@@ -127,10 +130,12 @@ messageInput.addEventListener("keydown", (event) => {
   }
 });
 
-exampleButton.addEventListener("click", () => {
+exampleSelect.addEventListener("change", () => {
   const lang = selectedLanguage();
-  if (lang) {
-    messageInput.value = lang.example;
+  const example = lang && lang.examples[exampleSelect.value];
+  exampleSelect.value = "";
+  if (example) {
+    messageInput.value = example.code;
     messageInput.focus();
   }
 });
@@ -142,12 +147,14 @@ commandsButton.addEventListener("click", () => {
 
 languageSelect.addEventListener("change", () => {
   updateExplainedLink();
+  updateExamples();
   showIntro();
 });
 
 async function init() {
   try {
     const res = await fetch("api/languages");
+    if (!res.ok) throw new Error(res.statusText);
     languages = (await res.json()).languages;
   } catch (err) {
     addMessage("bot", "Esoteric Chat", bubble("Could not load languages.", "error"));
@@ -160,7 +167,8 @@ async function init() {
     languageSelect.append(option);
   });
   updateExplainedLink();
-  addMessage("bot", "Esoteric Chat", bubble("Welcome! Pick a language, write some code and hit Send. Type $help to see every command."));
+  updateExamples();
+  addMessage("bot", "Esoteric Chat", bubble("Welcome! Pick a language, write some code and hit Send."));
   showIntro();
   messageInput.focus();
 }

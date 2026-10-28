@@ -54,6 +54,14 @@ class TestHatemath:
     def test_down_alphabet(self):
         assert interp.hatemath("</]/]") == "zy"
 
+    def test_past_z_fails(self):
+        with pytest.raises(interp.InterpreterError):
+            interp.hatemath("<" + "^" * 27)
+
+    def test_before_a_fails(self):
+        with pytest.raises(interp.InterpreterError):
+            interp.hatemath("<^/")
+
     def test_integers(self):
         assert interp.hatemath(">+++]--]") == "31"
 
@@ -92,18 +100,13 @@ class TestDeadSimple:
 
 class TestFiveCommand:
     def test_help_example(self):
-        assert interp.fivecommand("^p+^^^p+^^^p+^^^^^^^p")[0] == "1337"
+        assert interp.fivecommand("^p+^^^p+^^^p+^^^^^^^p") == "1337"
 
     def test_uppercase_aliases(self):
-        assert interp.fivecommand("^^VP")[0] == "1"
+        assert interp.fivecommand("^^VP") == "1"
 
     def test_negative_pointer(self):
-        assert interp.fivecommand("-^P+P")[0] == "10"
-
-    def test_debug_log(self):
-        output, debug = interp.fivecommand("^^p+^v-p")
-        assert output == "22"
-        assert debug == ["^ 1", "^ 2", "P", "->", "^ 1", "v 0", "<-", "P"]
+        assert interp.fivecommand("-^P+P") == "10"
 
 
 class TestUnnecessary:
@@ -118,6 +121,19 @@ class TestUnnecessary:
 class TestKallisti:
     def test_echoes(self):
         assert interp.kallisti("Everything is true") == "Everything is true"
+
+    @pytest.mark.parametrize("code", [
+        "", "  spaced  out  ", "line one\nline two", "$ping", "Zebra zz ZZ", "Café ß İ naïve", "1234 !?#",
+    ])
+    def test_round_trip_is_exact(self, code):
+        assert interp.kallisti(code) == code
+
+    def test_shift_really_changes_letters(self):
+        assert interp._shift("abz ABZ 9!", 5) == "fge FGE 9!"
+        assert interp._shift("fge FGE", -5) == "abz ABZ"
+
+    def test_swap_case_really_changes_letters(self):
+        assert "aBc ß".translate(interp.SWAP_CASE) == "AbC ß"
 
 
 class TestHq9Plus:

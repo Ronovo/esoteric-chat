@@ -10,7 +10,7 @@
   <div class="app">
     <header class="header">
       <h1>Esoteric Chat</h1>
-      <p class="subtitle">Pick a language and send code, or type <code>$help</code> for commands.</p>
+      <p class="subtitle">Pick a language and send code.</p>
     </header>
 
     <main id="log" class="log" aria-live="polite"></main>
@@ -19,7 +19,8 @@
       <div class="composer-row toolbar">
         <label class="sr-only" for="language">Language</label>
         <select id="language"></select>
-        <button type="button" id="example" class="secondary">Try example</button>
+        <label class="sr-only" for="example">Examples</label>
+        <select id="example"></select>
         <button type="button" id="commands" class="secondary">Commands</button>
         <a id="explained" class="button secondary" target="_blank" rel="noopener noreferrer">Language Explained</a>
       </div>

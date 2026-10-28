@@ -43,8 +43,10 @@ body {
   line-height: 1.45;
 }
 
-code, pre, textarea, select {
+/* No ligatures: Cascadia Code would draw <- as an arrow and --- as one solid line. */
+code, pre, textarea, select, .card dt {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-variant-ligatures: none;
 }
 
 .app {
@@ -101,7 +103,7 @@ code, pre, textarea, select {
 }
 .card h2 { margin: 0 0 8px; font-size: 1rem; }
 .card dl { margin: 0; }
-.card dt { font-weight: 600; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.card dt { font-weight: 600; }
 .card dd { margin: 0 0 6px; color: var(--muted); overflow-wrap: anywhere; }
 .card a { color: var(--accent); }
 
@@ -124,6 +126,7 @@ select, textarea {
   font-size: 0.92rem;
 }
 select { min-width: 0; flex: 1; max-width: 260px; }
+#example { flex: 0 1 auto; }
 textarea { flex: 1; min-width: 0; resize: vertical; min-height: 44px; max-height: 40vh; }
 select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 

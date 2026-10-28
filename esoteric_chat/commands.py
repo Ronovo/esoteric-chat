@@ -1,8 +1,12 @@
+import re
 import threading
 
 from . import interpreters as interp
 
 PREFIX = "$"
+# "$name", then everything after one separating space or newline, exactly as typed.
+COMMAND_RE = re.compile(r"\$(\S*)\s?(.*)", re.S)
+ECHO_LANGUAGE = "kallisti"
 
 
 def text(value):
@@ -24,51 +28,39 @@ def info_url(topic):
     return next((u for u in urls if "esolangs.org" in u), urls[0])
 
 
+# Listed in the order the language picker shows them: alphabetical by name.
 LANGUAGES = {
+    "fivecommand": {"name": "5command", "error": "Invalid 5command Command",
+                    "examples": [("Print 1337", "^p+^^^p+^^^p+^^^^^^^p")]},
     "bf": {
         "name": "Brainfart",
         "error": "Invalid Brainfart Command",
         "intro": "Brainfart - The Safe-For-Work alternative to BrainF**K",
-        "example": "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.",
-    },
-    "kallisti": {"name": "Kallisti", "error": "Invalid Kallisti Command", "example": "Everything is true"},
-    "unnecessary": {"name": "Unnecessary", "error": "Invalid Unnecessary Command", "example": "#"},
-    "hq9plus": {"name": "HQ9+", "error": "Invalid HQ9+ command!", "example": "qhq"},
-    "hatemath": {"name": "Hatemath", "error": "Invalid Hatemath Command", "example": "<^^^^^^^^]^]"},
-    "deadsimple": {"name": "DeadSimple", "error": "Invalid DeadSimple Command", "example": "S%+S^++S"},
-    "fivecommand": {"name": "5command", "error": "Invalid 5command Command", "example": "^p+^^^p+^^^p+^^^^^^^p"},
-    "debugfivecommand": {"name": "5command (debug)", "error": "Invalid 5command Command", "example": "^^p+^p"},
-}
-
-FIVECOMMAND_FIELDS = [
-    ("There are only 5 symbols allowed.", "-------------------------------"),
-    ("+", "Move pointer right on the tape"),
-    ("-", "Move pointer left on the tape"),
-    ("^", "Increments current cell at pointer"),
-    ("v", "Decrements current cell at pointer"),
-    ("P", "Prints current cell at pointer"),
-    ("Example: ^p+^^^p+^^^p+^^^^^^^p", "Output: 1337"),
-]
-
-HELP = {
-    "help": {
-        "title": "Help",
-        "color": "orange",
-        "fields": [
-            ("Language picker", "Pick a language from the dropdown and send code to run it directly"),
-            ("$ping", "Returns pong in Brainfart"),
-            ("$hi", "Returns hello in Brainfart"),
-            ("$bf <code>", "Interpreter that Runs Brainfart Programs"),
-            ("$kallisti <code>", "Interpreter that Runs Kallisti Programs"),
-            ("$unnecessary <code>", "Interpreter that Runs Unnecessary Programs"),
-            ("$hq9plus <code>", "Interpreter that Runs HQ9+ Programs"),
-            ("$hatemath <code>", "Interpreter that Runs hatemath Programs"),
-            ("$deadsimple <code>", "Interpreter that Runs DeadSimple Programs"),
-            ("$fivecommand <code>", "Interpreter that Runs 5command Programs"),
-            ("$help", "Returns this help"),
-            ("$help <command>", "Returns information about that commands language. ex $help bf"),
+        "examples": [
+            ("Print Hello World!", "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+."),
+            ("$hi: get a program that prints Hello", "$hi"),
+            ("$ping: get a program that prints Pong!", "$ping"),
         ],
     },
+    "deadsimple": {"name": "DeadSimple", "error": "Invalid DeadSimple Command", "examples": [("Print AbC", "S%+S^++S")]},
+    "hatemath": {"name": "Hatemath", "error": "Invalid Hatemath Command", "examples": [("Print hi", "<^^^^^^^^]^]")]},
+    "hq9plus": {"name": "HQ9+", "error": "Invalid HQ9+ command!", "examples": [("Run all four: Hello World, quine, 99 Bottles, add 1", "hq9+")]},
+    "kallisti": {
+        "name": "Kallisti",
+        "error": "Invalid Kallisti Command",
+        "intro": "Kallisti - Everything you send is repeated back exactly, even messages that start with $.",
+        "examples": [("Repeat Rule 3: Everything is true", "Everything is true")],
+    },
+    "unnecessary": {
+        "name": "Unnecessary",
+        "error": "Invalid Unnecessary Command",
+        "intro": "Unnecessary - A successful call is an empty program (or just #), which prints *. "
+                 "Anything else prints Unsuccessful.",
+        "examples": [("Successful call: prints *", "#")],
+    },
+}
+
+HELP = {
     "bf": {
         "title": "Brainfart",
         "color": "red",
@@ -110,6 +102,7 @@ HELP = {
             ("TL;DR", "-------------------------------"),
             ("Rule 1:", "If a program file exists, report error and fail"),
             ("Rule 2:", "If no program file exists, create program with NOP(No Operation) instruction"),
+            ("Successful call:", "An empty program, or just #, prints *. Anything else prints Unsuccessful"),
         ],
     },
     "hq9plus": {
@@ -123,7 +116,6 @@ HELP = {
             ("q", "Print Source Code(Quine)"),
             ("9", "Starts 99 Bottles of Beer on the wall"),
             ("+", "Increments the counter that is always running."),
-            ("Example:", 'code: qhq prints "qhq","Hello World! :)","qhq"'),
         ],
     },
     "hatemath": {
@@ -147,31 +139,27 @@ HELP = {
         "color": "dark_blue",
         "fields": [
             ("Esolangs.org Link:", "https://esolangs.org/wiki/DeadSimple"),
-            ("There are only 4 symbols allowed. Starts at A", "-------------------------------"),
+            ("There are only 5 symbols allowed. Starts at A", "-------------------------------"),
             ("+", "Move up Alphabet"),
             ("-", "Move down Alphabet"),
             ("S", "Print"),
-            ("_", "Reset to 0(see Note Below)"),
-            ("Note:", "Because of message limits, to cut down on input, I added two replacements for _"),
             ("^", "Start at Uppercase A"),
             ("%", "Start at Lowercase a"),
-            ("Example: S%+S^++S", "Output: AbC"),
+            ("Note:", "The original language resets with _. Because of message limits, ^ and % replace it here"),
         ],
     },
     "fivecommand": {
         "title": "5command",
         "color": "purple",
-        "fields": [("Esolangs.org Link:", "https://esolangs.org/wiki/5command")] + FIVECOMMAND_FIELDS + [
-            ("Note:", "If you want to see debug logs, call program with $debugfivecommand"),
-        ],
-    },
-    "debugfivecommand": {
-        "title": "Debug version of 5command",
-        "color": "purple",
         "fields": [
             ("Esolangs.org Link:", "https://esolangs.org/wiki/5command"),
-            ("-------------------------------", "Returns a Debug Log Along with a message"),
-        ] + FIVECOMMAND_FIELDS,
+            ("There are only 5 symbols allowed.", "-------------------------------"),
+            ("+", "Move pointer right on the tape"),
+            ("-", "Move pointer left on the tape"),
+            ("^", "Increments current cell at pointer"),
+            ("v", "Decrements current cell at pointer"),
+            ("P", "Prints current cell at pointer"),
+        ],
     },
 }
 
@@ -182,18 +170,17 @@ class ChatEngine:
         self._hq9_lock = threading.Lock()
 
     def languages(self):
-        return [{"id": key, "name": meta["name"], "example": meta["example"], "intro": meta.get("intro"),
+        return [{"id": key, "name": meta["name"], "intro": meta.get("intro"),
+                 "examples": [{"label": label, "code": code} for label, code in meta["examples"]],
                  "info_url": info_url(key), "help": help_card(key)} for key, meta in LANGUAGES.items()]
 
     def handle(self, message, language=None):
-        stripped = message.strip()
-        if stripped.startswith(PREFIX):
-            parts = stripped[len(PREFIX):].split(None, 1)
-            name = parts[0].lower() if parts else ""
-            args = parts[1] if len(parts) > 1 else ""
-            return self.command(name, args)
+        stripped = message.lstrip()
+        if stripped.startswith(PREFIX) and language != ECHO_LANGUAGE:
+            name, args = COMMAND_RE.match(stripped).groups()
+            return self.command(name.lower(), args)
         if not language:
-            return [error("Pick a language or send a command. Type $help for a list of commands.")]
+            return [error("Pick a language or send a command.")]
         return self.run_language(language, message)
 
     def command(self, name, args):
@@ -201,12 +188,9 @@ class ChatEngine:
             return [text(interp.PING_BF)]
         if name in ("hello", "hi"):
             return [text(interp.HELLO_BF)]
-        if name == "help":
-            topic = args.strip().lower() or "help"
-            return [help_card(topic)] if topic in HELP else [error("Invalid Command")]
         if name in LANGUAGES:
             return self.run_language(name, args)
-        return [error("Unknown command %s%s. Type $help for a list of commands." % (PREFIX, name))]
+        return [error("Unknown command %s%s." % (PREFIX, name))]
 
     def run_language(self, language, code):
         meta = LANGUAGES.get(language)
@@ -233,7 +217,4 @@ class ChatEngine:
             return [text(interp.hatemath(code))]
         if language == "deadsimple":
             return [text(interp.deadsimple(code))]
-        if language == "fivecommand":
-            return [text(interp.fivecommand(code)[0])]
-        output, debug = interp.fivecommand(code)
-        return [text("Result : %s" % output), text("Debug : %s" % ", ".join(debug))]
+        return [text(interp.fivecommand(code))]

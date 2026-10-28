@@ -1,8 +1,10 @@
+import string
 from collections import defaultdict
 
 MAX_STEPS = 1_000_000
 BF_TAPE_SIZE = 30000
 HQ9_MAX_MESSAGES = 10
+KALLISTI_SHIFT = 5
 
 PING_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++++++++++.>+++++++++++.-.-------.<<+++.'
 HELLO_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.'
@@ -78,8 +80,12 @@ def hatemath(code):
         elif ch == "-":
             x -= 1
         elif ch == "^":
+            if x == "z":
+                raise InterpreterError("moved past 'z'")
             x = "a" if x == "" else chr(ord(x[0]) + 1)
         elif ch == "/":
+            if x == "a":
+                raise InterpreterError("moved before 'a'")
             x = "z" if x == "" else chr(ord(x[0]) - 1)
         elif ch == "]":
             out.append(" " if x == "" else str(x))
@@ -112,36 +118,42 @@ def deadsimple(code):
 
 
 def fivecommand(code):
-    """Returns (output, debug_log)."""
     tape = defaultdict(int)
     p = 0
     out = []
-    debug = []
     for ch in code:
         if ch == "+":
             p += 1
-            debug.append("->")
         elif ch == "-":
             p -= 1
-            debug.append("<-")
         elif ch == "^":
             tape[p] += 1
-            debug.append("^ %s" % tape[p])
         elif ch in "vV":
             tape[p] -= 1
-            debug.append("v %s" % tape[p])
         elif ch in "pP":
             out.append(str(tape[p]))
-            debug.append("P")
-    return "".join(out), debug
+    return "".join(out)
 
 
 def unnecessary(code):
     return "*" if code.strip() in ("", "#") else "Unsuccessful"
 
 
+# ASCII letters only: str.swapcase() changes the length of some letters ("ß" -> "SS"), so it can't be undone.
+SWAP_CASE = str.maketrans(string.ascii_lowercase + string.ascii_uppercase,
+                          string.ascii_uppercase + string.ascii_lowercase)
+
+
+def _shift(text, places):
+    places %= 26
+    lower, upper = string.ascii_lowercase, string.ascii_uppercase
+    return text.translate(str.maketrans(lower + upper, lower[places:] + lower[:places] + upper[places:] + upper[:places]))
+
+
 def kallisti(code):
-    return code
+    """Reverses, swaps case and shifts the letters, then undoes all three, so the message comes back unchanged."""
+    scrambled = _shift(code[::-1].translate(SWAP_CASE), KALLISTI_SHIFT)
+    return _shift(scrambled, -KALLISTI_SHIFT).translate(SWAP_CASE)[::-1]
 
 
 def hq9plus(code, state):

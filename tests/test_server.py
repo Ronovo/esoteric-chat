@@ -48,12 +48,6 @@ def test_chat_command(client):
     assert res.get_json()["replies"] == [{"type": "text", "text": "A"}]
 
 
-def test_chat_help(client):
-    [card] = client.post("/api/chat", json={"message": "$help bf"}).get_json()["replies"]
-    assert card["type"] == "help"
-    assert card["title"] == "Brainfart"
-
-
 def test_hq9_accumulator_persists_between_requests(client):
     client.post("/api/chat", json={"message": "+", "language": "hq9plus"})
     res = client.post("/api/chat", json={"message": "+", "language": "hq9plus"})
