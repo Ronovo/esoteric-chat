@@ -25,21 +25,6 @@ docker build -t esoteric-chat .
 docker run -d -p 5000:5000 esoteric-chat
 ```
 
-### Inside another site
-
-`esoteric_chat.server.create_app()` returns a normal WSGI app, so a larger Flask site can mount it under a
-path. The page and its API use relative URLs, so the path can be anything. Pass `BACK_LINK`, a
-`{"href", "label"}` pair, to show a back link at the top of the page:
-
-```python
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from esoteric_chat.server import create_app as create_esoteric_chat
-
-app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
-    "/esoteric-chat": create_esoteric_chat({"BACK_LINK": {"href": "/projects", "label": "Projects"}}),
-})
-```
-
 ## Using the chat
 
 - Pick a language from the dropdown, type code, and press **Enter** (Shift+Enter adds a new line).
@@ -76,7 +61,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-The tests cover every interpreter, the `$` commands, the HTTP API, and running mounted under a path.
+The tests cover every interpreter, the `$` commands, and the HTTP API.
 
 ## Project layout
 

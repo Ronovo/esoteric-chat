@@ -58,7 +58,6 @@ code, pre, textarea, select {
 }
 
 .header { padding: 16px 0 8px; border-bottom: 1px solid var(--border); }
-.back { display: inline-block; margin-bottom: 6px; color: var(--accent); font-size: 0.9rem; font-weight: 600; text-decoration: none; }
 .header h1 { margin: 0; font-size: 1.4rem; }
 .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
 

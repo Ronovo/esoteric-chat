@@ -7,12 +7,9 @@ from .commands import ChatEngine
 MAX_REQUEST_BYTES = 64 * 1024
 
 
-def create_app(config=None, engine=None):
-    """`config` is merged into the Flask config; BACK_LINK ({"href", "label"}) adds a back link to the page."""
+def create_app(engine=None):
     app = Flask(__name__, static_folder="static", static_url_path="/static")
     app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
-    if config:
-        app.config.update(config)
     engine = engine or ChatEngine()
 
     @app.get("/")
