@@ -1,7 +1,10 @@
 import argparse
+import os
+import secrets
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
+from . import ronovo_sso
 from .commands import ChatEngine
 
 MAX_REQUEST_BYTES = 64 * 1024
@@ -9,12 +12,31 @@ MAX_REQUEST_BYTES = 64 * 1024
 
 def create_app(engine=None):
     app = Flask(__name__, static_folder="static", static_url_path="/static")
-    app.config["MAX_CONTENT_LENGTH"] = MAX_REQUEST_BYTES
+    app.config.update(
+        MAX_CONTENT_LENGTH=MAX_REQUEST_BYTES,
+        # Without ESOTERIC_CHAT_SECRET_KEY, Ronovo logins last until the app restarts.
+        SECRET_KEY=os.environ.get("ESOTERIC_CHAT_SECRET_KEY") or secrets.token_hex(32),
+        SESSION_COOKIE_NAME="esoteric_chat_session",
+        SESSION_COOKIE_SAMESITE="Lax",
+    )
     engine = engine or ChatEngine()
+
+    def ronovo_login(account):
+        session.clear()
+        session.permanent = True
+        session["ronovo_user"] = account["username"]
+        return redirect(url_for("index"))
+
+    ronovo_sso.add_flask_routes(app, "esoteric-chat", ronovo_login)
+
+    @app.post("/logout")
+    def logout():
+        session.clear()
+        return redirect(url_for("index"))
 
     @app.get("/")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", ronovo=ronovo_sso.enabled(), ronovo_user=session.get("ronovo_user"))
 
     @app.get("/api/languages")
     def languages():

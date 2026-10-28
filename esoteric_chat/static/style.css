@@ -62,6 +62,7 @@ code, pre, textarea, select, .card dt {
 .header { padding: 16px 0 8px; border-bottom: 1px solid var(--border); }
 .header h1 { margin: 0; font-size: 1.4rem; }
 .subtitle { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+.account { display: inline-block; margin-top: 8px; color: var(--muted); font-size: 0.9rem; }
 
 .log {
   flex: 1;

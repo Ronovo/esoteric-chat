@@ -25,6 +25,12 @@ docker build -t esoteric-chat .
 docker run -d -p 5000:5000 esoteric-chat
 ```
 
+### Log in with Ronovo
+
+With `RONOVO_SSO_URL` (the portfolio's address, such as `http://ronovo.lan`) and `RONOVO_SSO_PUBLIC_KEY`
+(printed by the portfolio's `python sso.py`) set, the header offers **Log in with Ronovo** and shows who is
+logged in. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` to keep logins across restarts.
+
 ## Using the chat
 
 - Pick a language from the dropdown, type code, and press **Enter** (Shift+Enter adds a new line).

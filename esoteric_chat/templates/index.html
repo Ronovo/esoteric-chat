@@ -11,6 +11,11 @@
     <header class="header">
       <h1>Esoteric Chat</h1>
       <p class="subtitle">Pick a language and send code.</p>
+      {% if ronovo_user %}
+      <form class="account" method="post" action="logout">Logged in as {{ ronovo_user }} <button class="secondary">Log out</button></form>
+      {% elif ronovo %}
+      <a class="account button secondary" href="sso/login">Log in with Ronovo</a>
+      {% endif %}
     </header>
 
     <main id="log" class="log" aria-live="polite"></main>
