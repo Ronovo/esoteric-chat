@@ -11,10 +11,11 @@
     <header class="header">
       <h1>Esoteric Chat</h1>
       <p class="subtitle">Pick a language and send code.</p>
-      {% if ronovo_user %}
-      <form class="account" method="post" action="logout">Logged in as {{ ronovo_user }} <button class="secondary">Log out</button></form>
-      {% elif ronovo %}
-      <a class="account button secondary" href="sso/login">Log in with Ronovo</a>
+      {% if portfolio_user %}
+      <form class="account" method="post" action="logout">Logged in as {{ portfolio_user }} <button class="secondary">Log out</button></form>
+      {% elif portfolio %}
+      <a class="account button secondary" id="portfolio-button" href="sso/login"
+         data-portfolio-url="{{ portfolio_url }}">Log in with portfolio account</a>
       {% endif %}
     </header>
 
