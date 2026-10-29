@@ -173,7 +173,6 @@ async function init() {
   messageInput.focus();
 }
 
-// Names the portfolio account this browser is logged in to on the login link, when the portfolio says who that is.
 function namePortfolioButton() {
   const link = document.getElementById("portfolio-button");
   if (!link) return;

@@ -25,9 +25,21 @@ docker build -t esoteric-chat .
 docker run -d -p 5000:5000 esoteric-chat
 ```
 
+On every start the container runs `docker/git-sync.sh` before the app. It fetches the latest commit on GitHub
+`main`, so a pushed commit goes live on the next restart without rebuilding the image. When that commit hasn't
+been built yet it reinstalls `requirements.txt` first, and a failed install is tried again on the next start. If
+GitHub can't be reached the app starts on the code it already has.
+
+| Variable | What it does | Default in the image |
+| --- | --- | --- |
+| `REPO_URL` | The repo to pull. Set it empty to run exactly what is in the image. | This repo on GitHub |
+| `REPO_BRANCH` | Branch to pull | `main` |
+| `SYNC_DIR` | Folder the code is pulled into | The app folder |
+| `BUILD_CMD` | Runs after pulling a commit that hasn't been built yet | `pip install -r requirements.txt` |
+
 ### Log in with a portfolio account
 
-With `PORTFOLIO_SSO_URL` (the portfolio's address, such as `http://ronovo.lan`) and `PORTFOLIO_SSO_PUBLIC_KEY`
+With `PORTFOLIO_SSO_URL` (the portfolio's address) and `PORTFOLIO_SSO_PUBLIC_KEY`
 (printed by the portfolio's `python sso.py`) set, the header offers to log in with a portfolio account and shows
 who is logged in. It reads **Log in as** and the portfolio username when this browser is logged in to the
 portfolio. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` to keep logins across restarts.
@@ -36,10 +48,12 @@ portfolio. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` t
 
 - Pick a language from the dropdown, type code, and press **Enter** (Shift+Enter adds a new line).
   **Try example** lists sample programs for the selected language and fills in the one you pick, **Commands** shows the language's
-  valid characters, and **Language Explained** opens its esolangs.org page.
-- Messages starting with `$` are commands and run regardless of the selected language, except Kallisti: with
+  valid characters, and **Language Explained** opens a page about the language (esolangs.org for most).
+- Messages starting with `$` (after any leading spaces) are commands and run regardless of the selected language, except Kallisti: with
   Kallisti selected, every message is repeated back exactly, `$` included.
 - Everything after the command name and one space (or new line) is passed on exactly as typed.
+- Limits: a message is at most 64 KB, Brainfart has a 30,000-cell tape and stops after 1,000,000 steps, and
+  HQ9+ runs at most 10 commands per message. The HQ9+ `+` accumulator is shared by everyone using the server.
 
 | Command | Description |
 | --- | --- |
@@ -59,7 +73,7 @@ portfolio. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` t
   order; the first is selected on load. `examples` is a list of `{"label", "code"}`, `intro` is shown when the
   language is selected (or `null`), and `help` is the card the **Commands** button shows.
 - `POST /api/chat` with `{"message": "...", "language": "bf"}` returns `{"replies": [...]}`. Each reply is
-  `{"type": "text" | "error", "text"}` or `{"type": "help", "title", "color", "fields": [{"name", "value"}]}`.
+  `{"type": "text" | "error", "text"}`.
 
 ## Tests
 
@@ -68,7 +82,8 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-The tests cover every interpreter, the `$` commands, and the HTTP API.
+The tests cover every interpreter, the `$` commands, the HTTP API and portfolio login.
+`requirements-dev.txt` includes `requirements.txt`, which the portfolio login tests need.
 
 ## Project layout
 
@@ -79,6 +94,11 @@ esoteric_chat/server.py         Flask app and the command-line entry point
 esoteric_chat/templates/        The chat page
 esoteric_chat/static/           Client script and styles
 tests/                          pytest suite
+pytest.ini
+docker/git-sync.sh              Updates the container from GitHub on start
+Dockerfile
+requirements.txt                Flask, PyJWT and ronovo-portfolio-auth (portfolio login)
+requirements-dev.txt            Adds pytest
 ```
 
 ## Differences from the Discord bot

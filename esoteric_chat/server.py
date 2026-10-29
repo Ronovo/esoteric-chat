@@ -4,7 +4,8 @@ import secrets
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
-from . import portfolio_sso
+from ronovo_portfolio_auth import portfolio_sso
+
 from .commands import ChatEngine
 
 MAX_REQUEST_BYTES = 64 * 1024

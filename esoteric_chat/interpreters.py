@@ -157,7 +157,7 @@ def kallisti(code):
 
 
 def hq9plus(code, state):
-    """Returns a list of messages. `state` holds the shared accumulator and is mutated by '+'."""
+    """`state` holds the shared accumulator and is mutated by '+'."""
     messages = []
     commands_run = 0
     for ch in code.lower():
