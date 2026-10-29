@@ -19,6 +19,7 @@ def create_app():
         SECRET_KEY=os.environ.get("ESOTERIC_CHAT_SECRET_KEY") or secrets.token_hex(32),
         SESSION_COOKIE_NAME="esoteric_chat_session",
         SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.environ.get("SECURE_COOKIES") == "1",
     )
     engine = ChatEngine()
     listing = {"languages": language_listing(), "prefix": PREFIX, "echo_language": ECHO_LANGUAGE}
