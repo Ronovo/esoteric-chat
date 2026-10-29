@@ -116,3 +116,7 @@ requirements-dev.txt            Adds pytest
 - Kallisti scrambles each message with 1 to 6 passes picked at random (reverse, swap case, shift letters, rotate,
   flip blocks, riffle), each with a random amount up to 6, then undoes them in reverse order, so the message still
   comes back exactly as sent.
+
+## License
+
+BSD 2-Clause. See [LICENSE](LICENSE).
