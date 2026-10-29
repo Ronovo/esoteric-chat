@@ -11,7 +11,7 @@ from .commands import ChatEngine
 MAX_REQUEST_BYTES = 64 * 1024
 
 
-def create_app(engine=None):
+def create_app():
     app = Flask(__name__, static_folder="static", static_url_path="/static")
     app.config.update(
         MAX_CONTENT_LENGTH=MAX_REQUEST_BYTES,
@@ -20,7 +20,7 @@ def create_app(engine=None):
         SESSION_COOKIE_NAME="esoteric_chat_session",
         SESSION_COOKIE_SAMESITE="Lax",
     )
-    engine = engine or ChatEngine()
+    engine = ChatEngine()
 
     def portfolio_login(account):
         session.clear()

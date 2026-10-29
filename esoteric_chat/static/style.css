@@ -44,7 +44,7 @@ body {
 }
 
 /* No ligatures: Cascadia Code would draw <- as an arrow and --- as one solid line. */
-code, pre, textarea, select, .card dt {
+pre, textarea, select, .card dt {
   font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
   font-variant-ligatures: none;
 }

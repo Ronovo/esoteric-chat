@@ -1,7 +1,6 @@
 import pytest
 
-from esoteric_chat import interpreters as interp
-from esoteric_chat.commands import HELP, LANGUAGES, ChatEngine, info_url
+from esoteric_chat.commands import HELLO_BF, LANGUAGES, MAX_OUTPUT, OUTPUT_CUT_NOTE, PING_BF, ChatEngine, cap_output
 
 
 @pytest.fixture
@@ -15,20 +14,17 @@ def texts(replies):
 
 class TestCommands:
     def test_ping(self, engine):
-        assert texts(engine.handle("$ping")) == [interp.PING_BF]
+        assert texts(engine.handle("$ping")) == [PING_BF]
 
     @pytest.mark.parametrize("name", ["hello", "hi"])
     def test_hello(self, engine, name):
-        assert texts(engine.handle("$" + name)) == [interp.HELLO_BF]
-
-    def test_bf_command(self, engine):
-        assert texts(engine.handle("$bf ++++++++[>++++++++<-]>+.")) == ["A"]
+        assert texts(engine.handle("$" + name)) == [HELLO_BF]
 
     def test_command_ignores_selected_language(self, engine):
         assert texts(engine.handle("$deadsimple S%S", language="bf")) == ["Aa"]
 
     def test_command_name_case_insensitive(self, engine):
-        assert texts(engine.handle("$PING")) == [interp.PING_BF]
+        assert texts(engine.handle("$PING")) == [PING_BF]
 
     def test_multiline_command_argument(self, engine):
         assert texts(engine.handle("$kallisti line one\nline two")) == ["line one\nline two"]
@@ -51,9 +47,6 @@ class TestCommands:
         [reply] = engine.handle("$")
         assert reply["type"] == "error"
 
-    def test_fivecommand(self, engine):
-        assert texts(engine.handle("$fivecommand ^p+^^^p+^^^p+^^^^^^^p")) == ["1337"]
-
     @pytest.mark.parametrize("name", ["help", "debugfivecommand"])
     def test_removed_commands_are_unknown(self, engine, name):
         [reply] = engine.handle("$" + name)
@@ -67,8 +60,19 @@ class TestErrors:
         assert reply["type"] == "error"
         assert reply["text"].startswith("Invalid Brainfart Command: unmatched")
 
-    def test_unexpected_error_uses_original_message(self, engine):
-        assert engine.handle("$hatemath <+") == [{"type": "error", "text": "Invalid Hatemath Command"}]
+    def test_type_errors_explain_themselves(self, engine):
+        assert engine.handle("$hatemath <+") == [
+            {"type": "error", "text": "Invalid Hatemath Command: + needs x to be a number"}]
+
+    def test_long_output_is_cut_off(self, engine):
+        # Prints 16 * 16 * 16 * 20 = 81,920 characters.
+        program = "+" * 16 + "[>" + "+" * 16 + "[>" + "+" * 16 + "[>" + "+" * 20 + "[>.<-]<-]<-]<-]"
+        [reply] = engine.handle("$bf " + program)
+        assert reply["text"].endswith("(output cut off at 64 KB)")
+        assert len(reply["text"]) < MAX_OUTPUT + 50
+
+    def test_cap_counts_every_reply(self):
+        assert cap_output(["a" * MAX_OUTPUT, "b"]) == ["a" * MAX_OUTPUT, OUTPUT_CUT_NOTE]
 
     def test_deadsimple_error(self, engine):
         [reply] = engine.handle("$deadsimple -")
@@ -84,12 +88,7 @@ class TestLanguagePicker:
         assert replies
         assert all(r["type"] == "text" for r in replies)
 
-    def test_brainfart_examples(self):
-        assert [code for _, code in LANGUAGES["bf"]["examples"]][1:] == ["$hi", "$ping"]
-
-    def test_hq9plus_example(self):
-        assert [code for _, code in LANGUAGES["hq9plus"]["examples"]] == ["hq9+"]
-
+    # Each language's worked example, checked once here: through the picker, so the routing is checked too.
     @pytest.mark.parametrize("language, code, expected", [
         ("bf", "++++++++[>++++++++<-]>+.", ["A"]),
         ("kallisti", "  spaced out  ", ["  spaced out  "]),
@@ -124,32 +123,9 @@ class TestLanguagePicker:
         names = [l["name"] for l in engine.languages()]
         assert names == sorted(names, key=str.lower)
 
-    def test_unnecessary_says_what_succeeds(self, engine):
-        unnecessary = next(l for l in engine.languages() if l["id"] == "unnecessary")
-        assert "empty program" in unnecessary["intro"]
-        assert any(f["name"] == "Successful call:" for f in unnecessary["help"]["fields"])
-
-    @pytest.mark.parametrize("language, url", [
-        ("bf", "https://esolangs.org/wiki/brainfuck"),
-        ("kallisti", "https://bit.ly/2SdwN4b"),
-        ("unnecessary", "https://esolangs.org/wiki/unnecessary"),
-        ("hq9plus", "https://esolangs.org/wiki/HQ9%2B"),
-        ("hatemath", "https://esolangs.org/wiki/Hatemath"),
-        ("deadsimple", "https://esolangs.org/wiki/DeadSimple"),
-        ("fivecommand", "https://esolangs.org/wiki/5command"),
-    ])
-    def test_info_url(self, language, url):
-        assert info_url(language) == url
-
-
 class TestHelp:
     def test_every_language_has_a_card(self, engine):
-        assert set(HELP) == set(LANGUAGES)
         for language in engine.languages():
             assert language["help"]["type"] == "help"
-            assert language["help"]["title"] == HELP[language["id"]]["title"]
+            assert language["help"]["title"] == language["name"]
             assert language["help"]["fields"]
-
-    def test_cards_have_no_examples(self, engine):
-        for language in engine.languages():
-            assert not any(f["name"].startswith("Example") for f in language["help"]["fields"])

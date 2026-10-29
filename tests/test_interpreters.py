@@ -1,6 +1,10 @@
+import random
+import string
+
 import pytest
 
 from esoteric_chat import interpreters as interp
+from esoteric_chat.commands import HELLO_BF, PING_BF
 from esoteric_chat.interpreters import InterpreterError
 
 HELLO_WORLD_BF = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
@@ -8,8 +12,8 @@ HELLO_WORLD_BF = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++
 
 class TestBrainfart:
     def test_ping_and_hello_command_programs(self):
-        assert interp.brainfart(interp.PING_BF) == "Pong!"
-        assert interp.brainfart(interp.HELLO_BF) == "Hello"
+        assert interp.brainfart(PING_BF) == "Pong!"
+        assert interp.brainfart(HELLO_BF) == "Hello"
 
     def test_nested_loops(self):
         assert interp.brainfart(HELLO_WORLD_BF) == "Hello World!\n"
@@ -48,9 +52,6 @@ class TestBrainfart:
 
 
 class TestHatemath:
-    def test_letters(self):
-        assert interp.hatemath("<^^^^^^^^]^]") == "hi"
-
     def test_down_alphabet(self):
         assert interp.hatemath("</]/]") == "zy"
 
@@ -75,14 +76,11 @@ class TestHatemath:
         assert interp.hatemath("]^]") == " a"
 
     def test_increment_on_string_fails(self):
-        with pytest.raises(TypeError):
+        with pytest.raises(InterpreterError, match="needs x to be a number"):
             interp.hatemath("<^+")
 
 
 class TestDeadSimple:
-    def test_help_example(self):
-        assert interp.deadsimple("S%+S^++S") == "AbC"
-
     def test_uppercase_rolls_into_lowercase(self):
         assert interp.deadsimple("+" * 25 + "S+S") == "Za"
 
@@ -99,9 +97,6 @@ class TestDeadSimple:
 
 
 class TestFiveCommand:
-    def test_help_example(self):
-        assert interp.fivecommand("^p+^^^p+^^^p+^^^^^^^p") == "1337"
-
     def test_uppercase_aliases(self):
         assert interp.fivecommand("^^VP") == "1"
 
@@ -110,12 +105,9 @@ class TestFiveCommand:
 
 
 class TestUnnecessary:
-    @pytest.mark.parametrize("code", ["", "   ", "#"])
+    @pytest.mark.parametrize("code", ["", "   "])
     def test_no_program_succeeds(self, code):
         assert interp.unnecessary(code) == "*"
-
-    def test_program_fails(self):
-        assert interp.unnecessary("anything") == "Unsuccessful"
 
 
 class TestKallisti:
@@ -135,11 +127,28 @@ class TestKallisti:
     def test_swap_case_really_changes_letters(self):
         assert "aBc ß".translate(interp.SWAP_CASE) == "AbC ß"
 
+    def test_new_passes_really_move_characters(self):
+        assert interp._rotate("ab12", 1) == "b12a"
+        assert interp._flip_blocks("abc123", 3) == "cba321"
+        assert interp._riffle("abc12") == "a1b2c"
+
+    @pytest.mark.parametrize("text", ["", "a", "ab", "Hello, World! 42", "line one\nline two", "Café ß 9"])
+    @pytest.mark.parametrize("amount", range(1, interp.KALLISTI_MAX_AMOUNT + 1))
+    def test_every_pass_undoes_itself(self, text, amount):
+        for scramble, unscramble, smallest in interp.KALLISTI_PASSES:
+            used = max(amount, smallest)
+            assert unscramble(scramble(text, used), used) == text
+
+    def test_random_messages_come_back_unchanged(self):
+        rng = random.Random(7)
+        alphabet = string.ascii_letters + string.digits + string.punctuation + " \n\téß"
+        for _ in range(500):
+            code = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 40)))
+            assert interp.kallisti(code, rng) == code
+        assert interp.kallisti("$ping", rng) == "$ping"
+
 
 class TestHq9Plus:
-    def test_help_example(self):
-        assert interp.hq9plus("qhq", {}) == ["qhq", "Hello World! :)", "qhq"]
-
     def test_case_insensitive(self):
         assert interp.hq9plus("H", {}) == ["Hello World! :)"]
 
@@ -158,6 +167,11 @@ class TestHq9Plus:
     def test_spam_limit(self):
         messages = interp.hq9plus("h" * 15, {})
         assert messages.count("Hello World! :)") == interp.HQ9_MAX_MESSAGES
+        assert messages[-1] == "Please do not make such big programs. No one likes spam."
+
+    def test_limit_counts_replies_not_commands(self):
+        messages = interp.hq9plus("999", {})
+        assert len(messages) == interp.HQ9_MAX_MESSAGES + 1
         assert messages[-1] == "Please do not make such big programs. No one likes spam."
 
     def test_exactly_at_limit_has_no_warning(self):

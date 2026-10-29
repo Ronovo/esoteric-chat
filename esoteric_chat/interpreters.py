@@ -1,14 +1,13 @@
+import random
 import string
 from collections import defaultdict
+from itertools import zip_longest
 
 MAX_STEPS = 1_000_000
 BF_TAPE_SIZE = 30000
 HQ9_MAX_MESSAGES = 10
-KALLISTI_SHIFT = 5
-
-PING_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++++++++++.>+++++++++++.-.-------.<<+++.'
-HELLO_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.'
-
+KALLISTI_MAX_PASSES = 6
+KALLISTI_MAX_AMOUNT = 6
 
 class InterpreterError(Exception):
     pass
@@ -75,15 +74,19 @@ def hatemath(code):
             x = ""
         elif ch == ">":
             x = 0
-        elif ch == "+":
-            x += 1
-        elif ch == "-":
-            x -= 1
+        elif ch in "+-":
+            if type(x) is not int:
+                raise InterpreterError("%s needs x to be a number" % ch)
+            x += 1 if ch == "+" else -1
         elif ch == "^":
+            if type(x) is not str:
+                raise InterpreterError("^ needs x to be a letter")
             if x == "z":
                 raise InterpreterError("moved past 'z'")
             x = "a" if x == "" else chr(ord(x[0]) + 1)
         elif ch == "/":
+            if type(x) is not str:
+                raise InterpreterError("/ needs x to be a letter")
             if x == "a":
                 raise InterpreterError("moved before 'a'")
             x = "z" if x == "" else chr(ord(x[0]) - 1)
@@ -150,23 +153,64 @@ def _shift(text, places):
     return text.translate(str.maketrans(lower + upper, lower[places:] + lower[:places] + upper[places:] + upper[:places]))
 
 
-def kallisti(code):
-    """Reverses, swaps case and shifts the letters, then undoes all three, so the message comes back unchanged."""
-    scrambled = _shift(code[::-1].translate(SWAP_CASE), KALLISTI_SHIFT)
-    return _shift(scrambled, -KALLISTI_SHIFT).translate(SWAP_CASE)[::-1]
+def _rotate(text, places):
+    """Moves the first `places` characters to the end."""
+    if not text:
+        return text
+    places %= len(text)
+    return text[places:] + text[:places]
+
+
+def _flip_blocks(text, size):
+    """Reverses each run of `size` characters. Doing it twice puts the text back."""
+    return "".join(text[i:i + size][::-1] for i in range(0, len(text), size))
+
+
+def _riffle(text):
+    """Interleaves the first half with the second, like a shuffled deck: abcde -> adbec."""
+    half = (len(text) + 1) // 2
+    return "".join(a + b for a, b in zip_longest(text[:half], text[half:], fillvalue=""))
+
+
+def _unriffle(text):
+    return text[0::2] + text[1::2]
+
+
+# (scramble, unscramble, smallest amount). Every pass takes an amount; most ignore it.
+KALLISTI_PASSES = (
+    (lambda text, _: text[::-1], lambda text, _: text[::-1], 1),
+    (lambda text, _: text.translate(SWAP_CASE), lambda text, _: text.translate(SWAP_CASE), 1),
+    (_shift, lambda text, places: _shift(text, -places), 1),
+    (_rotate, lambda text, places: _rotate(text, -places), 1),
+    (_flip_blocks, _flip_blocks, 2),
+    (lambda text, _: _riffle(text), lambda text, _: _unriffle(text), 1),
+)
+
+
+def kallisti(code, rng=random):
+    """Scrambles the message with 1-6 passes picked at random, then undoes them in reverse order, so it comes back
+    unchanged."""
+    done = []
+    for _ in range(rng.randint(1, KALLISTI_MAX_PASSES)):
+        scramble, unscramble, smallest = rng.choice(KALLISTI_PASSES)
+        amount = rng.randint(smallest, KALLISTI_MAX_AMOUNT)
+        code = scramble(code, amount)
+        done.append((unscramble, amount))
+    for unscramble, amount in reversed(done):
+        code = unscramble(code, amount)
+    return code
 
 
 def hq9plus(code, state):
     """`state` holds the shared accumulator and is mutated by '+'."""
     messages = []
-    commands_run = 0
+    stopped = False
     for ch in code.lower():
         if ch not in "hq9+":
             continue
-        if commands_run >= HQ9_MAX_MESSAGES:
-            messages.append("Please do not make such big programs. No one likes spam.")
+        if len(messages) >= HQ9_MAX_MESSAGES:
+            stopped = True
             break
-        commands_run += 1
         if ch == "h":
             messages.append("Hello World! :)")
         elif ch == "q":
@@ -179,4 +223,7 @@ def hq9plus(code, state):
         elif ch == "+":
             state["accumulator"] = state.get("accumulator", 0) + 1
             messages.append("Accumulator is now at %s" % state["accumulator"])
+    if stopped or len(messages) > HQ9_MAX_MESSAGES:
+        del messages[HQ9_MAX_MESSAGES:]
+        messages.append("Please do not make such big programs. No one likes spam.")
     return messages

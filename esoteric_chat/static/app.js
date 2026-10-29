@@ -69,6 +69,12 @@ function helpCard(reply) {
   card.style.setProperty("--card-color", "var(--" + reply.color + ")");
   const title = document.createElement("h2");
   title.textContent = reply.title;
+  card.append(title);
+  if (reply.about) {
+    const about = document.createElement("p");
+    about.textContent = reply.about;
+    card.append(about);
+  }
   const list = document.createElement("dl");
   reply.fields.forEach((field) => {
     const dt = document.createElement("dt");
@@ -77,12 +83,11 @@ function helpCard(reply) {
     linkify(dd, field.value);
     list.append(dt, dd);
   });
-  card.append(title, list);
+  card.append(list);
   return card;
 }
 
 function renderReply(reply) {
-  if (reply.type === "help") return helpCard(reply);
   if (reply.type === "error") return bubble(reply.text, "error");
   if (reply.text === "") return bubble("(no output)", "empty");
   return bubble(reply.text);

@@ -52,8 +52,8 @@ portfolio. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` t
 - Messages starting with `$` (after any leading spaces) are commands and run regardless of the selected language, except Kallisti: with
   Kallisti selected, every message is repeated back exactly, `$` included.
 - Everything after the command name and one space (or new line) is passed on exactly as typed.
-- Limits: a message is at most 64 KB, Brainfart has a 30,000-cell tape and stops after 1,000,000 steps, and
-  HQ9+ runs at most 10 commands per message. The HQ9+ `+` accumulator is shared by everyone using the server.
+- Limits: a message is at most 64 KB and so is a reply (longer output is cut off with a note), Brainfart has a
+  30,000-cell tape and stops after 1,000,000 steps, and HQ9+ sends at most 10 replies per message. The HQ9+ `+` accumulator is shared by everyone using the server.
 
 | Command | Description |
 | --- | --- |
@@ -107,5 +107,6 @@ requirements-dev.txt            Adds pytest
 - HQ9+ accepts upper- and lowercase commands, and the `+` accumulator is kept in memory per server process
   instead of in `index.json`.
 - `$close` was dropped because there is no bot connection to close.
-- Kallisti reverses each message, swaps its upper and lower case and shifts every letter 5 places, then undoes
-  all three, so the message still comes back exactly as sent.
+- Kallisti scrambles each message with 1 to 6 passes picked at random (reverse, swap case, shift letters, rotate,
+  flip blocks, riffle), each with a random amount up to 6, then undoes them in reverse order, so the message still
+  comes back exactly as sent.
