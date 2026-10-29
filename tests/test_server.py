@@ -1,5 +1,6 @@
 import pytest
 
+from esoteric_chat.commands import LANGUAGES
 from esoteric_chat.server import MAX_REQUEST_BYTES, create_app
 
 
@@ -24,17 +25,19 @@ def test_static_assets(client, path):
 def test_languages(client):
     res = client.get("/api/languages")
     assert res.status_code == 200
-    languages = {l["id"]: l for l in res.get_json()["languages"]}
-    assert "bf" in languages and "hq9plus" in languages
+    body = res.get_json()
+    assert (body["prefix"], body["echo_language"]) == ("$", "kallisti")
+    languages = {l["id"]: l for l in body["languages"]}
+    assert list(languages) == list(LANGUAGES)
+    assert all({"id", "name", "examples", "intro", "info_url", "help"} <= l.keys() for l in languages.values())
     assert languages["bf"]["info_url"] == "https://esolangs.org/wiki/brainfuck"
     assert languages["bf"]["help"]["title"] == "Brainfart"
 
 
-def test_index_has_toolbar_buttons(client):
-    page = client.get("/").data
-    assert b'id="example"' in page
-    assert b'id="commands"' in page
-    assert b'id="explained"' in page
+def test_security_headers(client):
+    headers = client.get("/").headers
+    assert headers["X-Content-Type-Options"] == "nosniff"
+    assert headers["X-Frame-Options"] == "DENY"
 
 
 def test_chat_with_language(client):

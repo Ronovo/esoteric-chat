@@ -4,7 +4,10 @@ from collections import defaultdict
 from itertools import zip_longest
 
 MAX_STEPS = 1_000_000
+# Replies are cut off once together they pass this many characters.
+MAX_OUTPUT = 64 * 1024
 BF_TAPE_SIZE = 30000
+BF_COMMANDS = frozenset("<>+-.,[]")
 HQ9_MAX_MESSAGES = 10
 KALLISTI_MAX_PASSES = 6
 KALLISTI_MAX_AMOUNT = 6
@@ -37,11 +40,14 @@ def brainfart(code, max_steps=MAX_STEPS):
     out = []
     i = 0
     steps = 0
-    while i < len(code):
+    while i < len(code) and len(out) <= MAX_OUTPUT:
+        ch = code[i]
+        if ch not in BF_COMMANDS:
+            i += 1
+            continue
         steps += 1
         if steps > max_steps:
             raise InterpreterError("program exceeded %d steps" % max_steps)
-        ch = code[i]
         if ch == ">":
             p += 1
             if p >= BF_TAPE_SIZE:

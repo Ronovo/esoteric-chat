@@ -46,6 +46,17 @@ class TestBrainfart:
         with pytest.raises(InterpreterError, match="before the start"):
             interp.brainfart("<")
 
+    def test_pointer_past_the_end_of_the_tape(self):
+        with pytest.raises(InterpreterError, match="past the end"):
+            interp.brainfart(">" * interp.BF_TAPE_SIZE)
+
+    def test_comments_are_not_counted_as_steps(self):
+        assert interp.brainfart("x" * 2000 + "+.", max_steps=2) == "\x01"
+
+    def test_output_stops_just_past_the_limit(self):
+        output = interp.brainfart("+[.]", max_steps=10 * interp.MAX_OUTPUT)
+        assert len(output) == interp.MAX_OUTPUT + 1
+
     def test_infinite_loop_hits_step_limit(self):
         with pytest.raises(InterpreterError, match="exceeded"):
             interp.brainfart("+[]", max_steps=1000)
@@ -118,7 +129,8 @@ class TestKallisti:
         "", "  spaced  out  ", "line one\nline two", "$ping", "Zebra zz ZZ", "Café ß İ naïve", "1234 !?#",
     ])
     def test_round_trip_is_exact(self, code):
-        assert interp.kallisti(code) == code
+        for seed in range(20):
+            assert interp.kallisti(code, random.Random(seed)) == code
 
     def test_shift_really_changes_letters(self):
         assert interp._shift("abz ABZ 9!", 5) == "fge FGE 9!"
@@ -127,7 +139,7 @@ class TestKallisti:
     def test_swap_case_really_changes_letters(self):
         assert "aBc ß".translate(interp.SWAP_CASE) == "AbC ß"
 
-    def test_new_passes_really_move_characters(self):
+    def test_rotate_flip_and_riffle_move_characters(self):
         assert interp._rotate("ab12", 1) == "b12a"
         assert interp._flip_blocks("abc123", 3) == "cba321"
         assert interp._riffle("abc12") == "a1b2c"

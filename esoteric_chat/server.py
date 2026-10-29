@@ -6,7 +6,7 @@ from flask import Flask, jsonify, redirect, render_template, request, session, u
 
 from ronovo_portfolio_auth import portfolio_sso
 
-from .commands import ChatEngine
+from .commands import ECHO_LANGUAGE, PREFIX, ChatEngine, language_listing
 
 MAX_REQUEST_BYTES = 64 * 1024
 
@@ -21,6 +21,7 @@ def create_app():
         SESSION_COOKIE_SAMESITE="Lax",
     )
     engine = ChatEngine()
+    listing = {"languages": language_listing(), "prefix": PREFIX, "echo_language": ECHO_LANGUAGE}
 
     def portfolio_login(account):
         session.clear()
@@ -35,14 +36,22 @@ def create_app():
         session.clear()
         return redirect(url_for("index"))
 
+    @app.after_request
+    def security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
     @app.get("/")
     def index():
-        return render_template("index.html", portfolio=portfolio_sso.enabled(), portfolio_user=session.get("portfolio_user"),
-                               portfolio_url=portfolio_sso.portfolio_url() if portfolio_sso.enabled() else "")
+        portfolio = portfolio_sso.enabled()
+        return render_template("index.html", portfolio=portfolio, portfolio_user=session.get("portfolio_user"),
+                               portfolio_url=portfolio_sso.portfolio_url() if portfolio else "")
 
     @app.get("/api/languages")
     def languages():
-        return jsonify(languages=engine.languages())
+        return jsonify(listing)
 
     @app.post("/api/chat")
     def chat():
@@ -67,6 +76,8 @@ def main():
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
+    if args.debug and args.host not in ("127.0.0.1", "localhost"):
+        print("Warning: --debug lets anyone who can reach this server run Python code on it.")
     create_app().run(host=args.host, port=args.port, debug=args.debug)
 
 

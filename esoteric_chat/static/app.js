@@ -8,6 +8,8 @@ const commandsButton = document.getElementById("commands");
 const explainedLink = document.getElementById("explained");
 
 let languages = [];
+let prefix = null;
+let echoLanguage = null;
 
 function selectedLanguage() {
   return languages.find((l) => l.id === languageSelect.value);
@@ -96,8 +98,8 @@ function renderReply(reply) {
 async function send(message) {
   const language = languageSelect.value;
   const lang = selectedLanguage();
-  const isCommand = message.trim().startsWith("$") && language !== "kallisti";
-  addMessage("user", isCommand ? "command" : lang ? lang.name : language, bubble(message));
+  const isCommand = prefix !== null && message.trimStart().startsWith(prefix) && language !== echoLanguage;
+  addMessage("user", isCommand ? "command" : lang ? lang.name : language || "no language", bubble(message));
   sendButton.disabled = true;
   try {
     const res = await fetch("api/chat", {
@@ -106,7 +108,7 @@ async function send(message) {
       body: JSON.stringify({ message, language }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
+    if (!res.ok || !Array.isArray(data.replies)) {
       addMessage("bot", "Esoteric Chat", bubble(data.error || "Request failed (" + res.status + ")", "error"));
       return;
     }
@@ -160,7 +162,7 @@ async function init() {
   try {
     const res = await fetch("api/languages");
     if (!res.ok) throw new Error(res.statusText);
-    languages = (await res.json()).languages;
+    ({ languages, prefix, echo_language: echoLanguage } = await res.json());
   } catch (err) {
     addMessage("bot", "Esoteric Chat", bubble("Could not load languages.", "error"));
     return;

@@ -4,7 +4,7 @@ A Flask chat web app that interprets esoteric languages. It is a port of my esot
 
 ## Running
 
-Requires Python 3.9 or newer.
+Requires Python 3.10 or newer.
 
 ```sh
 python -m venv .venv
@@ -14,7 +14,8 @@ python -m esoteric_chat.server   # http://127.0.0.1:5000  (--host, --port, --deb
 ```
 
 `python -m esoteric_chat.server` uses Flask's built-in server, which is fine on your own machine or a LAN.
-Use `--host 0.0.0.0` so other machines can connect.
+Use `--host 0.0.0.0` so other machines can connect. Don't add `--debug` then: its debugger lets anyone who can
+reach the server run Python code on it, and the server warns when the two are used together.
 
 ### Docker
 
@@ -26,16 +27,16 @@ docker run -d -p 5000:5000 esoteric-chat
 ```
 
 On every start the container runs `docker/git-sync.sh` before the app. It fetches the latest commit on GitHub
-`main`, so a pushed commit goes live on the next restart without rebuilding the image. When that commit hasn't
-been built yet it reinstalls `requirements.txt` first, and a failed install is tried again on the next start. If
-GitHub can't be reached the app starts on the code it already has.
+`main`, so a pushed commit goes live on the next restart without rebuilding the image, and removes files the
+commit doesn't have. When that commit hasn't been built yet it reinstalls `requirements.txt` first, and a failed
+install is tried again on the next start. If GitHub can't be reached the app starts on the code it already has.
 
 | Variable | What it does | Default in the image |
 | --- | --- | --- |
 | `REPO_URL` | The repo to pull. Set it empty to run exactly what is in the image. | This repo on GitHub |
 | `REPO_BRANCH` | Branch to pull | `main` |
 | `SYNC_DIR` | Folder the code is pulled into | The app folder |
-| `BUILD_CMD` | Runs after pulling a commit that hasn't been built yet | `pip install -r requirements.txt` |
+| `BUILD_CMD` | Runs after pulling a commit that hasn't been built yet | `pip install --no-cache-dir --user -q -r requirements.txt` |
 
 ### Log in with a portfolio account
 
@@ -48,12 +49,15 @@ portfolio. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` t
 
 - Pick a language from the dropdown, type code, and press **Enter** (Shift+Enter adds a new line).
   **Try example** lists sample programs for the selected language and fills in the one you pick, **Commands** shows the language's
-  valid characters, and **Language Explained** opens a page about the language (esolangs.org for most).
+  valid characters, and **Language Explained** opens the language's esolangs.org page.
 - Messages starting with `$` (after any leading spaces) are commands and run regardless of the selected language, except Kallisti: with
   Kallisti selected, every message is repeated back exactly, `$` included.
-- Everything after the command name and one space (or new line) is passed on exactly as typed.
-- Limits: a message is at most 64 KB and so is a reply (longer output is cut off with a note), Brainfart has a
-  30,000-cell tape and stops after 1,000,000 steps, and HQ9+ sends at most 10 replies per message. The HQ9+ `+` accumulator is shared by everyone using the server.
+- Everything after the command name and one whitespace character (a space, tab or new line) is passed on exactly
+  as typed.
+- Limits: a request is at most 64 KB, and the replies to one message are at most 65,536 characters together
+  (longer output is cut off with a note). Brainfart has a 30,000-cell tape and stops after 1,000,000 steps;
+  characters that aren't commands don't count. HQ9+ sends at most 10 replies per message, then one more asking
+  for smaller programs. The HQ9+ `+` accumulator is shared by everyone using the server.
 
 | Command | Description |
 | --- | --- |
@@ -69,9 +73,11 @@ portfolio. Nothing is saved to the account yet. Set `ESOTERIC_CHAT_SECRET_KEY` t
 
 ## API
 
-- `GET /api/languages` returns `{"languages": [{"id", "name", "examples", "intro", "info_url", "help"}]}` in picker
-  order; the first is selected on load. `examples` is a list of `{"label", "code"}`, `intro` is shown when the
-  language is selected (or `null`), and `help` is the card the **Commands** button shows.
+- `GET /api/languages` returns `{"languages": [{"id", "name", "examples", "intro", "info_url", "help"}], "prefix",
+  "echo_language"}`, the languages in picker order; the first is selected on load. `examples` is a list of
+  `{"label", "code"}`, `intro` is shown when the language is selected (or `null`), and `help` is the card the
+  **Commands** button shows. `prefix` starts a command and `echo_language` is the one that repeats commands back,
+  so the page labels messages the way the server reads them.
 - `POST /api/chat` with `{"message": "...", "language": "bf"}` returns `{"replies": [...]}`. Each reply is
   `{"type": "text" | "error", "text"}`.
 

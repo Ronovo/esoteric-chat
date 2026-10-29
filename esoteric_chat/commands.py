@@ -4,11 +4,11 @@ import threading
 from . import interpreters as interp
 
 PREFIX = "$"
-# "$name", then everything after one separating space or newline, exactly as typed.
+# "$name", then everything after one separating whitespace character, exactly as typed.
 COMMAND_RE = re.compile(r"\$(\S*)\s?(.*)", re.S)
 ECHO_LANGUAGE = "kallisti"
-MAX_OUTPUT = 64 * 1024
-OUTPUT_CUT_NOTE = "\n... (output cut off at 64 KB)"
+MAX_OUTPUT = interp.MAX_OUTPUT
+OUTPUT_CUT_NOTE = f"\n... (output cut off at {MAX_OUTPUT:,} characters)"
 
 PING_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++++++++++.>+++++++++++.-.-------.<<+++.'
 HELLO_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.'
@@ -24,13 +24,12 @@ def error(value):
 
 def help_card(language):
     meta = LANGUAGES[language]
-    return {"type": "help", "title": meta["name"], "color": meta["color"], "about": meta.get("about"),
+    return {"title": meta["name"], "color": meta["color"], "about": meta.get("about"),
             "fields": [{"name": n, "value": v} for n, v in meta["fields"]]}
 
 
 def info_url(language):
-    urls = [v for _, v in LANGUAGES[language]["fields"] if v.startswith("http")]
-    return next((u for u in urls if "esolangs.org" in u), urls[0])
+    return next(v for _, v in LANGUAGES[language]["fields"] if "esolangs.org" in v)
 
 
 def cap_output(messages):
@@ -45,13 +44,13 @@ def cap_output(messages):
     return capped
 
 
-# Listed in the order the language picker shows them: alphabetical by name. `run` takes the engine and the code and
-# returns the reply texts.
+# Listed in the order the language picker shows them: alphabetical by name. `run` takes the code and returns the
+# reply text; HQ9+ has no `run` because the engine runs it against the shared accumulator.
 LANGUAGES = {
     "fivecommand": {
         "name": "5command",
         "color": "purple",
-        "run": lambda engine, code: [interp.fivecommand(code)],
+        "run": interp.fivecommand,
         "examples": [("Print 1337", "^p+^^^p+^^^p+^^^^^^^p")],
         "about": "There are only 5 symbols allowed.",
         "fields": [
@@ -66,7 +65,7 @@ LANGUAGES = {
     "bf": {
         "name": "Brainfart",
         "color": "red",
-        "run": lambda engine, code: [interp.brainfart(code)],
+        "run": interp.brainfart,
         "intro": "Brainfart - The Safe-For-Work alternative to BrainF**K",
         "examples": [
             ("Print Hello World!", "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+."),
@@ -81,8 +80,8 @@ LANGUAGES = {
             ("<", "Move to Previous Element"),
             ("+", "Increment Current Element"),
             ("-", "Decrement Current Element"),
-            (",", "Await Input(Currently Not Implemented)"),
-            (".", "Output Current Element(in ASCII)"),
+            (",", "Await Input (Not Implemented)"),
+            (".", "Output Current Element (in ASCII)"),
             ("[", "Jump past matching ] if Element is 0"),
             ("]", "Jump back to matching [ if Element is not 0"),
         ],
@@ -90,7 +89,7 @@ LANGUAGES = {
     "deadsimple": {
         "name": "DeadSimple",
         "color": "dark_blue",
-        "run": lambda engine, code: [interp.deadsimple(code)],
+        "run": interp.deadsimple,
         "examples": [("Print AbC", "S%+S^++S")],
         "about": "There are only 5 symbols allowed. Starts at A.",
         "fields": [
@@ -106,7 +105,7 @@ LANGUAGES = {
     "hatemath": {
         "name": "Hatemath",
         "color": "red",
-        "run": lambda engine, code: [interp.hatemath(code)],
+        "run": interp.hatemath,
         "examples": [("Print hi", "<^^^^^^^^]^]")],
         "about": "There are only 8 symbols, working on 1 variable named x.",
         "fields": [
@@ -116,34 +115,33 @@ LANGUAGES = {
             (">", "Sets type of X to 0"),
             ("+", "Increment if it is an integer"),
             ("-", "Decrement if it is an integer"),
-            ("^", "Move forward in alphabet(Only lowercase supported)"),
-            ("/", "Move down the alphabet(Only lowercase supported)"),
+            ("^", "Move up the alphabet (lowercase only)"),
+            ("/", "Move down the alphabet (lowercase only)"),
             ("]", "Print Value"),
         ],
     },
     "hq9plus": {
         "name": "HQ9+",
         "color": "orange",
-        "run": lambda engine, code: engine.run_hq9plus(code),
         "examples": [("Run all four: Hello World, quine, 99 Bottles, add 1", "hq9+")],
         "about": "There are only 4 symbols allowed.",
         "fields": [
             ("Esolangs.org Link:", "https://esolangs.org/wiki/HQ9%2B"),
             ("h", "Prints Hello World"),
-            ("q", "Print Source Code(Quine)"),
+            ("q", "Prints Source Code (Quine)"),
             ("9", "Starts 99 Bottles of Beer on the wall"),
-            ("+", "Increments the counter that is always running."),
+            ("+", "Increments the counter that is always running"),
         ],
     },
     "kallisti": {
         "name": "Kallisti",
         "color": "blue",
-        "run": lambda engine, code: [interp.kallisti(code)],
+        "run": interp.kallisti,
         "intro": "Kallisti - Everything you send is repeated back exactly, even messages that start with $.",
         "examples": [("Repeat Rule 3: Everything is true", "Everything is true")],
         "about": "<anything> ::= <anything>",
         "fields": [
-            ("EsoLangs.org Link:", "https://esolangs.org/wiki/Kallisti"),
+            ("Esolangs.org Link:", "https://esolangs.org/wiki/Kallisti"),
             ("Rule 1:", "Obey as many rules as possible"),
             ("Rule 2:", "There is plenty nothing"),
             ("Rule 3:", "Everything is true"),
@@ -155,30 +153,31 @@ LANGUAGES = {
     "unnecessary": {
         "name": "Unnecessary",
         "color": "blue",
-        "run": lambda engine, code: [interp.unnecessary(code)],
+        "run": interp.unnecessary,
         "intro": "Unnecessary - A successful call is an empty program (or just #), which prints *. "
                  "Anything else prints Unsuccessful.",
         "examples": [("Successful call: prints *", "#")],
         "fields": [
-            ("Official Site", "http://yiap.nfshost.com/esoteric/unnecessary/unnecessary.html"),
+            ("Official Site:", "http://yiap.nfshost.com/esoteric/unnecessary/unnecessary.html"),
             ("Esolangs.org Link:", "https://esolangs.org/wiki/unnecessary"),
             ("Rule 1:", "If a program file exists, report error and fail"),
-            ("Rule 2:", "If no program file exists, create program with NOP(No Operation) instruction"),
+            ("Rule 2:", "If no program file exists, create program with NOP (No Operation) instruction"),
             ("Successful call:", "An empty program, or just #, prints *. Anything else prints Unsuccessful"),
         ],
     },
 }
 
 
+def language_listing():
+    return [{"id": key, "name": meta["name"], "intro": meta.get("intro"),
+             "examples": [{"label": label, "code": code} for label, code in meta["examples"]],
+             "info_url": info_url(key), "help": help_card(key)} for key, meta in LANGUAGES.items()]
+
+
 class ChatEngine:
     def __init__(self):
         self.hq9_state = {"accumulator": 0}
         self._hq9_lock = threading.Lock()
-
-    def languages(self):
-        return [{"id": key, "name": meta["name"], "intro": meta.get("intro"),
-                 "examples": [{"label": label, "code": code} for label, code in meta["examples"]],
-                 "info_url": info_url(key), "help": help_card(key)} for key, meta in LANGUAGES.items()]
 
     def handle(self, message, language=None):
         stripped = message.lstrip()
@@ -203,7 +202,8 @@ class ChatEngine:
         if meta is None:
             return [error("Unknown language: %s" % language)]
         try:
-            return [text(m) for m in cap_output(meta["run"](self, code))]
+            replies = [meta["run"](code)] if "run" in meta else self.run_hq9plus(code)
+            return [text(m) for m in cap_output(replies)]
         except interp.InterpreterError as e:
             return [error("Invalid %s Command: %s" % (meta["name"], e))]
 
