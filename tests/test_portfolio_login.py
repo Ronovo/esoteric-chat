@@ -45,21 +45,60 @@ def test_portfolio_login_and_logout(issue):
     client = create_app().test_client()
     assert b"Log in with portfolio account" in client.get("/").data
     state = start_login(client)
-    assert client.post("/sso/callback", data={"state": state, "token": issue()}).status_code == 302
+    res = client.post("/sso/callback", data={"state": state, "token": issue(sub="7")})
+    assert res.status_code == 302
+    assert res.location == "/"
+    with client.session_transaction() as sess:
+        assert sess["portfolio_sub"] == "7"
+        assert sess["portfolio_user"] == "ronovo"
     assert b"Logged in as ronovo" in client.get("/").data
     client.post("/logout")
     assert b"Logged in as" not in client.get("/").data
 
 
-@pytest.mark.parametrize("bad", [
-    {"state": "wrong"},
-    {"aud": "casino"},
-    {"expires_in": -10},
+def test_portfolio_login_returns_to_the_next_page(issue):
+    client = create_app().test_client()
+    res = client.get("/sso/login?next=/coverage/")
+    state = parse_qs(urlsplit(res.location).query)["state"][0]
+    res = client.post("/sso/callback", data={"state": state, "token": issue()})
+    assert res.status_code == 302
+    assert res.location == "/coverage/"
+
+
+def test_portfolio_login_with_an_empty_name_counts_as_logged_in(issue):
+    client = create_app().test_client()
+    state = start_login(client)
+    client.post("/sso/callback", data={"state": state, "token": issue(name="")})
+    page = client.get("/").data
+    assert b"Logged in as" in page
+    assert b"Log in with portfolio account" not in page
+
+
+EXPIRED = b"Your portfolio login expired. Try again."
+INVALID = b"That portfolio login didn&#39;t check out. Try again."
+
+
+@pytest.mark.parametrize("bad, message", [
+    ({"state": "wrong"}, EXPIRED),
+    ({"aud": "casino"}, INVALID),
+    ({"expires_in": -10}, INVALID),
 ])
-def test_portfolio_login_rejects_bad_callbacks(issue, bad):
+def test_portfolio_login_rejects_bad_callbacks(issue, bad, message):
     client = create_app().test_client()
     state = start_login(client)
     token = issue(aud=bad.get("aud", "esoteric-chat"), expires_in=bad.get("expires_in", 300))
     res = client.post("/sso/callback", data={"state": bad.get("state", state), "token": token})
-    assert res.status_code == 400
-    assert b"Logged in as" not in client.get("/").data
+    assert res.status_code == 302
+    assert res.location == "/"
+    page = client.get("/").data
+    assert message in page
+    assert b"Logged in as" not in page
+    assert message not in client.get("/").data
+
+
+def test_portfolio_callback_without_a_login_in_progress(issue):
+    client = create_app().test_client()
+    res = client.post("/sso/callback", data={"state": "anything", "token": issue()})
+    assert res.status_code == 302
+    assert res.location == "/"
+    assert EXPIRED in client.get("/").data

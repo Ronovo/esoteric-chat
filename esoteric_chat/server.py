@@ -3,7 +3,7 @@ import os
 import secrets
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 from ronovo_portfolio_auth import portfolio_sso
 
@@ -26,13 +26,18 @@ def create_app():
     engine = ChatEngine()
     listing = {"languages": language_listing(), "prefix": PREFIX, "echo_language": ECHO_LANGUAGE}
 
-    def portfolio_login(account):
+    def portfolio_login(account, next_path):
         session.clear()
         session.permanent = True
+        session["portfolio_sub"] = account["sub"]
         session["portfolio_user"] = account["username"]
+        return redirect(next_path or url_for("index"))
+
+    def portfolio_error(reason):
+        flash(portfolio_sso.LOGIN_MESSAGES[reason])
         return redirect(url_for("index"))
 
-    portfolio_sso.add_flask_routes(app, "esoteric-chat", portfolio_login)
+    portfolio_sso.add_flask_routes(app, "esoteric-chat", portfolio_login, portfolio_error)
 
     @app.post("/logout")
     def logout():
@@ -49,7 +54,8 @@ def create_app():
     @app.get("/")
     def index():
         portfolio = portfolio_sso.enabled()
-        return render_template("index.html", portfolio=portfolio, portfolio_user=session.get("portfolio_user"),
+        return render_template("index.html", portfolio=portfolio, logged_in="portfolio_sub" in session,
+                               portfolio_user=session.get("portfolio_user"),
                                portfolio_url=portfolio_sso.portfolio_url() if portfolio else "")
 
     @app.get("/api/languages")

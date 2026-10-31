@@ -34,8 +34,9 @@ function reply(status, body) {
 /* The page as Flask renders it, with the portfolio button only when portfolioUrl is given. */
 function render(portfolioUrl) {
   const body = TEMPLATE.slice(TEMPLATE.indexOf('<body>') + 6, TEMPLATE.indexOf('<script'));
-  document.body.innerHTML = body.replace(/{% if portfolio_user %}[\s\S]*?{% elif portfolio %}([\s\S]*?){% endif %}/,
-    (_, button) => (portfolioUrl ? button.replace('{{ portfolio_url }}', portfolioUrl) : ''));
+  document.body.innerHTML = body.replace(/{% if logged_in %}[\s\S]*?{% elif portfolio %}([\s\S]*?){% endif %}/,
+    (_, button) => (portfolioUrl ? button.replace('{{ portfolio_url }}', portfolioUrl) : ''))
+    .replace(/{% for message in get_flashed_messages\(\) %}[\s\S]*?{% endfor %}/, '');
 }
 
 async function settle() {

@@ -11,12 +11,13 @@
     <header class="header">
       <h1>Esoteric Chat</h1>
       <p class="subtitle">Pick a language and send code.</p>
-      {% if portfolio_user %}
+      {% if logged_in %}
       <form class="account" method="post" action="logout">Logged in as {{ portfolio_user }} <button class="secondary">Log out</button></form>
       {% elif portfolio %}
       <a class="account button secondary" id="portfolio-button" href="sso/login"
          data-portfolio-url="{{ portfolio_url }}">Log in with portfolio account</a>
       {% endif %}
+      {% for message in get_flashed_messages() %}<p class="subtitle">{{ message }}</p>{% endfor %}
     </header>
 
     <main id="log" class="log" aria-live="polite"></main>
