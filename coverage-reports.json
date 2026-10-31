@@ -1,0 +1,10 @@
+{
+  "title": "Esoteric Chat",
+  "source": "https://github.com/Ronovo/esoteric-chat",
+  "reports": [
+    { "label": "Python server", "path": "python/", "summary": "status.json", "functions": "functions.json", "format": "coverage.py",
+      "about": "esoteric_chat/, measured with coverage.py" },
+    { "label": "JavaScript client", "path": "js/", "summary": "coverage-summary.json", "format": "istanbul",
+      "about": "esoteric_chat/static/app.js, measured with Vitest" }
+  ]
+}

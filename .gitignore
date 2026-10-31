@@ -8,3 +8,8 @@ venv/
 # Editors
 .idea/
 .vscode/
+
+# Tests
+.coverage
+coverage/
+node_modules/

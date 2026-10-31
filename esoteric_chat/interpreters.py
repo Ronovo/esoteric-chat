@@ -226,7 +226,7 @@ def hq9plus(code, state):
                 messages.append("%s bottles of beer on the wall! %s bottles of beer!" % (bottles, bottles))
                 messages.append("Take one down, and pass it around, %s bottles of beer on the wall!" % (bottles - 1))
             messages.append("....and So On")
-        elif ch == "+":
+        elif ch == "+":  # pragma: no branch - the loop already skipped everything but h, q, 9 and +
             state["accumulator"] = state.get("accumulator", 0) + 1
             messages.append("Accumulator is now at %s" % state["accumulator"])
     if stopped or len(messages) > HQ9_MAX_MESSAGES:

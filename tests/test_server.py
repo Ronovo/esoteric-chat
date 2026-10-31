@@ -1,5 +1,8 @@
+import sys
+
 import pytest
 
+from esoteric_chat import server
 from esoteric_chat.commands import LANGUAGES
 from esoteric_chat.server import MAX_REQUEST_BYTES, create_app
 
@@ -77,3 +80,41 @@ def test_message_too_large(client):
 
 def test_unknown_route(client):
     assert client.get("/nope").status_code == 404
+
+
+def test_coverage_reports_are_served_from_their_folder(client, monkeypatch, tmp_path):
+    reports = tmp_path / "coverage"
+    (reports / "python").mkdir(parents=True)
+    (reports / "index.html").write_text("landing page", encoding="utf-8")
+    (reports / "python" / "index.html").write_text("python report", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("secret", encoding="utf-8")
+    monkeypatch.setattr(server, "COVERAGE_DIR", reports)
+    assert client.get("/coverage").status_code == 308
+    assert client.get("/coverage/").data == b"landing page"
+    assert client.get("/coverage/python/").data == b"python report"
+    for path in ("/coverage/js/", "/coverage/../secret.txt", "/coverage/%2e%2e/secret.txt"):
+        assert client.get(path).status_code == 404, path
+
+
+@pytest.mark.parametrize("host, warned", [("0.0.0.0", True), ("localhost", False)])
+def test_main_runs_the_app_and_warns_about_public_debugging(monkeypatch, capsys, host, warned):
+    run = []
+    monkeypatch.setattr(sys, "argv", ["server.py", "--host", host, "--port", "5050", "--debug"])
+    monkeypatch.setattr(server.Flask, "run", lambda app, **options: run.append(options))
+    server.main()
+    assert run == [{"host": host, "port": 5050, "debug": True}]
+    assert ("Warning" in capsys.readouterr().out) == warned
+
+
+def test_main_runs_privately_by_default(monkeypatch, capsys):
+    run = []
+    monkeypatch.setattr(sys, "argv", ["server.py"])
+    monkeypatch.setattr(server.Flask, "run", lambda app, **options: run.append(options))
+    server.main()
+    assert run == [{"host": "127.0.0.1", "port": 5000, "debug": False}]
+    assert capsys.readouterr().out == ""
+
+
+def test_deeply_nested_json_is_refused(client):
+    nested = b"[" * 30_000 + b"]" * 30_000
+    assert client.post("/api/chat", data=nested, content_type="application/json").status_code == 400

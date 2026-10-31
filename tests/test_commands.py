@@ -13,6 +13,11 @@ from esoteric_chat.commands import (
 )
 
 
+# What each example's label says it prints.
+PRINTS = {"Print 1337": "1337", "Print Hello World!": "Hello World!", "Print AbC": "AbC", "Print hi": "hi",
+          "Repeat Rule 3: Everything is true": "Everything is true", "Successful call: prints *": "*"}
+
+
 @pytest.fixture
 def engine():
     return ChatEngine()
@@ -98,6 +103,23 @@ class TestLanguagePicker:
         replies = engine.handle(code, language=language)
         assert replies
         assert all(r["type"] == "text" for r in replies)
+
+    @pytest.mark.parametrize("language, label, code", [(language, label, code) for language, meta in LANGUAGES.items()
+                                                       for label, code in meta["examples"] if label in PRINTS])
+    def test_examples_print_what_their_labels_say(self, engine, language, label, code):
+        assert texts(engine.handle(code, language=language)) == [PRINTS[label]]
+
+    def test_the_hq9plus_example_runs_all_four_commands(self, engine):
+        [(_, code)] = LANGUAGES["hq9plus"]["examples"]
+        replies = texts(engine.handle(code, language="hq9plus"))
+        assert replies[:2] == ["Hello World! :)", code]
+        assert replies[2].startswith("99 bottles")
+        assert replies[-1] == "Accumulator is now at 1"
+
+    def test_every_example_has_its_output_checked(self):
+        labels = {label for meta in LANGUAGES.values() for label, _ in meta["examples"]}
+        commands = {label for label in labels if label.startswith("$")}
+        assert labels - commands - set(PRINTS) == {LANGUAGES["hq9plus"]["examples"][0][0]}
 
     @pytest.mark.parametrize("language, code, expected", [
         ("bf", "++++++++[>++++++++<-]>+.", ["A"]),

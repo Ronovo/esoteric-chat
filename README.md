@@ -91,6 +91,26 @@ python -m pytest
 The tests cover every interpreter, the `$` commands, the HTTP API and portfolio login.
 `requirements-dev.txt` includes `requirements.txt`, which the portfolio login tests need.
 
+The chat page's script has its own tests, run with Vitest on Node.js after `npm install` once:
+
+```sh
+npm test
+```
+
+### Coverage
+
+```sh
+python -m coverage run -m pytest
+python -m coverage report
+python -m coverage html
+npm run coverage
+```
+
+The HTML reports go to `coverage/python` and `coverage/js`, and the coverage commands fail below 100%. The Docker
+image builds both reports and serves them at `/coverage/`, under the landing page in `coverage-index/`, the
+`ronovos-coverage-index` submodule, with this repo's `coverage-reports.json`. Failing tests or low coverage don't
+stop the image build; the reports show what is missing.
+
 ## Project layout
 
 ```
@@ -99,12 +119,15 @@ esoteric_chat/commands.py       ChatEngine: $commands, language metadata, help c
 esoteric_chat/server.py         Flask app and the command-line entry point
 esoteric_chat/templates/        The chat page
 esoteric_chat/static/           Client script and styles
-tests/                          pytest suite
+tests/                          pytest suite; js/ holds the chat page's Vitest tests
+coverage-index/                 The test coverage landing page, the ronovos-coverage-index submodule
+coverage-reports.json           This repo's entry for that page: its name and reports
 pytest.ini
 docker/git-sync.sh              Updates the container from GitHub on start
 Dockerfile
 requirements.txt                Flask, PyJWT and ronovo-portfolio-auth (portfolio login)
-requirements-dev.txt            Adds pytest
+requirements-dev.txt            Adds pytest and coverage
+package.json                    The chat page's test tools (Vitest, jsdom)
 ```
 
 ## Differences from the Discord bot

@@ -5,3 +5,6 @@
 .pytest_cache
 Dockerfile
 .dockerignore
+node_modules
+coverage
+.coverage

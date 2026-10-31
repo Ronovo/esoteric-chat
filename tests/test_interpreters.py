@@ -90,8 +90,19 @@ class TestHatemath:
         with pytest.raises(InterpreterError, match="needs x to be a number"):
             interp.hatemath("<^+")
 
+    @pytest.mark.parametrize("code", [">^", "[^", ">/", "[/"])
+    def test_letter_moves_need_a_letter(self, code):
+        with pytest.raises(InterpreterError, match="needs x to be a letter"):
+            interp.hatemath(code)
+
+    def test_other_characters_are_ignored(self):
+        assert interp.hatemath("> +x+ ]") == "2"
+
 
 class TestDeadSimple:
+    def test_steps_back_within_a_case(self):
+        assert interp.deadsimple("++-S %++-S") == "Bb"
+
     def test_uppercase_rolls_into_lowercase(self):
         assert interp.deadsimple("+" * 25 + "S+S") == "Za"
 
@@ -113,6 +124,9 @@ class TestFiveCommand:
 
     def test_negative_pointer(self):
         assert interp.fivecommand("-^P+P") == "10"
+
+    def test_other_characters_are_ignored(self):
+        assert interp.fivecommand("^ ^x p") == "2"
 
 
 class TestUnnecessary:

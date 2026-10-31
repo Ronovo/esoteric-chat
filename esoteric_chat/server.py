@@ -1,14 +1,16 @@
 import argparse
 import os
 import secrets
+from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 from ronovo_portfolio_auth import portfolio_sso
 
 from .commands import ECHO_LANGUAGE, PREFIX, ChatEngine, language_listing
 
 MAX_REQUEST_BYTES = 64 * 1024
+COVERAGE_DIR = Path(__file__).resolve().parent.parent / "coverage"
 
 
 def create_app():
@@ -56,13 +58,23 @@ def create_app():
 
     @app.post("/api/chat")
     def chat():
-        body = request.get_json(silent=True)
+        try:
+            body = request.get_json(silent=True)
+        except RecursionError:
+            body = None
         if not isinstance(body, dict) or not isinstance(body.get("message"), str):
             return jsonify(error="Expected JSON body with a 'message' string"), 400
         language = body.get("language")
         if language is not None and not isinstance(language, str):
             return jsonify(error="'language' must be a string"), 400
         return jsonify(replies=engine.handle(body["message"], language))
+
+    @app.get("/coverage/", defaults={"path": ""})
+    @app.get("/coverage/<path:path>")
+    def coverage(path):
+        if not path or path.endswith("/"):
+            path += "index.html"
+        return send_from_directory(COVERAGE_DIR, path)
 
     @app.errorhandler(413)
     def too_large(_):
