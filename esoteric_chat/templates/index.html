@@ -1,42 +1,67 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ account_theme or 'esoteric' }}" data-account-theme="{{ account_theme or '' }}"
+      data-logged-in="{{ '1' if logged_in else '' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Esoteric Chat</title>
   <link rel="stylesheet" href="static/style.css">
+  <script src="static/theme.js"></script>
 </head>
 <body>
   <div class="app">
     <header class="header">
-      <h1>Esoteric Chat</h1>
-      <p class="subtitle">Pick a language and send code.</p>
-      {% if logged_in %}
-      <form class="account" method="post" action="logout">Logged in as {{ portfolio_user }} <button class="secondary">Log out</button></form>
-      {% elif portfolio %}
-      <a class="account button secondary" id="portfolio-button" href="sso/login"
-         data-portfolio-url="{{ portfolio_url }}">Log in with portfolio account</a>
-      {% endif %}
-      {% for message in get_flashed_messages() %}<p class="subtitle">{{ message }}</p>{% endfor %}
+      <div>
+        <h1>Esoteric Chat</h1>
+        <p class="subtitle">Pick a language and send code.</p>
+      </div>
+      <div class="header-actions">
+        {% include "_theme_picker.html" %}
+        {% if logged_in %}
+        <form class="account" method="post" action="logout">Logged in as {{ portfolio_user }} <button class="secondary">Log out</button></form>
+        {% elif portfolio %}
+        <a class="account button secondary" id="portfolio-button" href="sso/login"
+           data-portfolio-url="{{ portfolio_url }}">Log in with portfolio account</a>
+        {% endif %}
+      </div>
+      {% for message in get_flashed_messages() %}<p class="subtitle flash">{{ message }}</p>{% endfor %}
     </header>
 
-    <main id="log" class="log" aria-live="polite"></main>
+    <nav class="sidebar" aria-label="Chats">
+      <button type="button" id="new-chat" class="secondary">New chat</button>
+      <ul id="chat-list" class="chat-list"></ul>
+    </nav>
 
-    <form id="composer" class="composer">
-      <div class="composer-row toolbar">
-        <label class="sr-only" for="language">Language</label>
-        <select id="language"></select>
-        <label class="sr-only" for="example">Examples</label>
-        <select id="example"></select>
-        <button type="button" id="commands" class="secondary">Commands</button>
-        <a id="explained" class="button secondary" target="_blank" rel="noopener noreferrer">Language Explained</a>
+    <section class="chat">
+      <div id="logs" class="logs"></div>
+
+      <form id="composer" class="composer">
+        <div class="composer-row toolbar">
+          <label class="sr-only" for="language">Language</label>
+          <select id="language"></select>
+          <label class="sr-only" for="example">Examples</label>
+          <select id="example"></select>
+          <button type="button" id="commands" class="secondary">Commands</button>
+          <a id="explained" class="button secondary" target="_blank" rel="noopener noreferrer">Language Explained</a>
+          <button type="button" id="clear-chat" class="secondary">Clear Chat</button>
+        </div>
+        <div class="composer-row">
+          <label class="sr-only" for="message">Message</label>
+          <textarea id="message" rows="4" placeholder="Enter code. Enter to send, Shift+Enter for a new line." autocomplete="off" spellcheck="false"></textarea>
+          <button type="submit" id="send">Send</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="clear-confirm" class="confirm" hidden>
+    <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="clear-question">
+      <p id="clear-question">Clear this chat?</p>
+      <div class="confirm-actions">
+        <button type="button" id="clear-yes">Yes</button>
+        <button type="button" id="clear-no" class="secondary">No</button>
       </div>
-      <div class="composer-row">
-        <label class="sr-only" for="message">Message</label>
-        <textarea id="message" rows="2" placeholder="Enter code or a $command. Enter to send, Shift+Enter for a new line." autocomplete="off" spellcheck="false"></textarea>
-        <button type="submit" id="send">Send</button>
-      </div>
-    </form>
+    </div>
   </div>
   <script src="static/app.js"></script>
 </body>

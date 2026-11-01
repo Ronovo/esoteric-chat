@@ -1,11 +1,11 @@
 import pytest
 
+from esoteric_chat import interpreters as interp
 from esoteric_chat.commands import (
-    HELLO_BF,
+    KALLISTI_LABEL,
     LANGUAGES,
     MAX_OUTPUT,
     OUTPUT_CUT_NOTE,
-    PING_BF,
     ChatEngine,
     cap_output,
     info_url,
@@ -14,7 +14,7 @@ from esoteric_chat.commands import (
 
 
 # What each example's label says it prints.
-PRINTS = {"Print 1337": "1337", "Print Hello World!": "Hello World!", "Print AbC": "AbC", "Print hi": "hi",
+PRINTS = {"Print 1337": "1337", "Print Hello World!": "Hello World!", "Print hello world": "hello world",
           "Repeat Rule 3: Everything is true": "Everything is true", "Successful call: prints *": "*"}
 
 
@@ -27,63 +27,60 @@ def texts(replies):
     return [r["text"] for r in replies]
 
 
-class TestCommands:
-    def test_ping(self, engine):
-        assert texts(engine.handle("$ping")) == [PING_BF]
+def without_scrambled(replies):
+    """The replies without Kallisti's scrambled copy, which changes on every run."""
+    return [r for r in replies if not r.startswith(KALLISTI_LABEL)]
 
-    @pytest.mark.parametrize("name", ["hello", "hi"])
-    def test_hello(self, engine, name):
-        assert texts(engine.handle("$" + name)) == [HELLO_BF]
 
-    def test_command_ignores_selected_language(self, engine):
-        assert texts(engine.handle("$deadsimple S%S", language="bf")) == ["Aa"]
+@pytest.fixture
+def reversing(monkeypatch):
+    """Kallisti with one known scramble: the message reversed."""
+    monkeypatch.setattr(interp, "kallisti", lambda code: (code[::-1], code))
 
-    def test_command_name_case_insensitive(self, engine):
-        assert texts(engine.handle("$PING")) == [PING_BF]
 
-    def test_multiline_command_argument(self, engine):
-        assert texts(engine.handle("$kallisti line one\nline two")) == ["line one\nline two"]
+class TestMessages:
+    @pytest.mark.parametrize("message", ["$unnecessary", "   $unnecessary", "$ping", "$"])
+    def test_dollar_messages_run_in_the_selected_language(self, engine, message):
+        assert texts(engine.handle(message, language="unnecessary")) == ["Unsuccessful"]
 
-    def test_command_keeps_argument_exactly(self, engine):
-        assert texts(engine.handle("$kallisti   two  spaces  ")) == ["  two  spaces  "]
+    def test_kallisti_repeats_dollar_messages(self, engine, reversing):
+        assert texts(engine.handle("$unnecessary", language="kallisti")) == ["Scrambled:\nyrassecennu$", "$unnecessary"]
 
-    def test_leading_spaces_before_a_command(self, engine):
-        assert texts(engine.handle("   $ping")) == [PING_BF]
+    def test_kallisti_keeps_the_message_exactly(self, engine):
+        message = "  line one\n\tline two  "
+        assert without_scrambled(texts(engine.handle(message, language="kallisti"))) == [message]
 
-    def test_a_tab_separates_the_command_from_its_argument(self, engine):
-        assert texts(engine.handle("$kallisti\t two")) == [" two"]
+    def test_kallisti_shows_the_scrambled_message_before_the_echo(self, engine, reversing):
+        assert texts(engine.handle("abc", language="kallisti")) == ["Scrambled:\ncba", "abc"]
 
-    def test_kallisti_repeats_dollar_messages(self, engine):
-        assert texts(engine.handle("$ping", language="kallisti")) == ["$ping"]
+    def test_kallisti_cuts_only_the_scrambled_copy_to_fit(self, engine, reversing):
+        message = "a" * 40_000 + "z"
+        scrambled, echo = texts(engine.handle(message, language="kallisti"))
+        assert echo == message
+        assert scrambled.startswith(KALLISTI_LABEL + "z") and scrambled.endswith(OUTPUT_CUT_NOTE)
+        assert len(scrambled) + len(echo) == MAX_OUTPUT
 
-    def test_command_without_args(self, engine):
-        assert texts(engine.handle("$unnecessary")) == ["*"]
-
-    def test_unknown_command(self, engine):
-        [reply] = engine.handle("$nope")
-        assert reply["type"] == "error"
-        assert "$nope" in reply["text"]
-
-    def test_bare_prefix(self, engine):
-        [reply] = engine.handle("$")
-        assert reply["type"] == "error"
-
+    def test_kallisti_leaves_the_scrambled_copy_out_without_room_for_the_note(self, engine, reversing):
+        fits = "a" * (MAX_OUTPUT - len(KALLISTI_LABEL) - len(OUTPUT_CUT_NOTE))
+        assert len(texts(engine.handle(fits, language="kallisti"))) == 2
+        message = fits + "a"
+        assert texts(engine.handle(message, language="kallisti")) == [message]
 
 
 class TestErrors:
     def test_interpreter_error_includes_reason(self, engine):
-        [reply] = engine.handle("$bf [")
+        [reply] = engine.handle("[", language="bf")
         assert reply["type"] == "error"
         assert reply["text"].startswith("Invalid Brainfart Command: unmatched")
 
     def test_type_errors_explain_themselves(self, engine):
-        assert engine.handle("$hatemath <+") == [
+        assert engine.handle("<+", language="hatemath") == [
             {"type": "error", "text": "Invalid Hatemath Command: + needs x to be a number"}]
 
     def test_long_output_is_cut_off(self, engine):
         # Prints 16 * 16 * 16 * 20 = 81,920 characters.
         program = "+" * 16 + "[>" + "+" * 16 + "[>" + "+" * 16 + "[>" + "+" * 20 + "[>.<-]<-]<-]<-]"
-        [reply] = engine.handle("$bf " + program)
+        [reply] = engine.handle(program, language="bf")
         assert reply["text"].endswith(OUTPUT_CUT_NOTE)
         assert len(reply["text"]) < MAX_OUTPUT + 50
 
@@ -91,7 +88,7 @@ class TestErrors:
         assert cap_output(["a" * MAX_OUTPUT, "b"]) == ["a" * MAX_OUTPUT, OUTPUT_CUT_NOTE]
 
     def test_deadsimple_error(self, engine):
-        [reply] = engine.handle("$deadsimple -")
+        [reply] = engine.handle("-S", language="deadsimple")
         assert reply["type"] == "error"
         assert reply["text"].startswith("Invalid DeadSimple Command")
 
@@ -107,7 +104,7 @@ class TestLanguagePicker:
     @pytest.mark.parametrize("language, label, code", [(language, label, code) for language, meta in LANGUAGES.items()
                                                        for label, code in meta["examples"] if label in PRINTS])
     def test_examples_print_what_their_labels_say(self, engine, language, label, code):
-        assert texts(engine.handle(code, language=language)) == [PRINTS[label]]
+        assert without_scrambled(texts(engine.handle(code, language=language))) == [PRINTS[label]]
 
     def test_the_hq9plus_example_runs_all_four_commands(self, engine):
         [(_, code)] = LANGUAGES["hq9plus"]["examples"]
@@ -116,10 +113,13 @@ class TestLanguagePicker:
         assert replies[2].startswith("99 bottles")
         assert replies[-1] == "Accumulator is now at 1"
 
+    @pytest.mark.parametrize("language", LANGUAGES)
+    def test_every_language_has_an_intro_starting_with_its_name(self, language):
+        assert language_listing()[list(LANGUAGES).index(language)]["intro"].startswith(LANGUAGES[language]["name"] + " - ")
+
     def test_every_example_has_its_output_checked(self):
         labels = {label for meta in LANGUAGES.values() for label, _ in meta["examples"]}
-        commands = {label for label in labels if label.startswith("$")}
-        assert labels - commands - set(PRINTS) == {LANGUAGES["hq9plus"]["examples"][0][0]}
+        assert labels - set(PRINTS) == {LANGUAGES["hq9plus"]["examples"][0][0]}
 
     @pytest.mark.parametrize("language, code, expected", [
         ("bf", "++++++++[>++++++++<-]>+.", ["A"]),
@@ -128,15 +128,15 @@ class TestLanguagePicker:
         ("unnecessary", "print", ["Unsuccessful"]),
         ("hq9plus", "qhq", ["qhq", "Hello World! :)", "qhq"]),
         ("hatemath", "<^^^^^^^^]^]", ["hi"]),
-        ("deadsimple", "S%+S^++S", ["AbC"]),
+        ("deadsimple", "+" * 72 + "S" + "+" * 33 + "S", ["Hi"]),
         ("fivecommand", "^p+^^^p+^^^p+^^^^^^^p", ["1337"]),
     ])
     def test_runs_selected_language(self, engine, language, code, expected):
-        assert texts(engine.handle(code, language=language)) == expected
+        assert without_scrambled(texts(engine.handle(code, language=language))) == expected
 
-    def test_no_language_selected(self, engine):
-        [reply] = engine.handle("+++.")
-        assert reply["type"] == "error"
+    @pytest.mark.parametrize("message", ["+++.", "$unnecessary"])
+    def test_no_language_selected(self, engine, message):
+        assert engine.handle(message) == [{"type": "error", "text": "Pick a language."}]
 
     def test_unknown_language(self, engine):
         [reply] = engine.handle("+++.", language="cobol")

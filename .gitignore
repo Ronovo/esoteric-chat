@@ -13,3 +13,6 @@ venv/
 .coverage
 coverage/
 node_modules/
+
+# Saved chats and the generated session key
+data/

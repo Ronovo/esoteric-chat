@@ -1,0 +1,6 @@
+<label class="theme-picker">
+  <span class="sr-only">Theme</span>
+  <select data-theme-picker>
+    {% for theme_id, label in themes.items() %}<option value="{{ theme_id }}">{{ label }}</option>{% endfor %}
+  </select>
+</label>

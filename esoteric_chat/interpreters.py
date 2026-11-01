@@ -1,15 +1,15 @@
 import random
+import re
 import string
+import sys
 from collections import defaultdict
-from itertools import zip_longest
 
 MAX_STEPS = 1_000_000
 # Replies are cut off once together they pass this many characters.
 MAX_OUTPUT = 64 * 1024
 BF_TAPE_SIZE = 30000
 BF_COMMANDS = frozenset("<>+-.,[]")
-HQ9_MAX_MESSAGES = 10
-KALLISTI_MAX_PASSES = 6
+KALLISTI_MAX_PASSES = 13
 KALLISTI_MAX_AMOUNT = 6
 
 class InterpreterError(Exception):
@@ -102,26 +102,18 @@ def hatemath(code):
 
 
 def deadsimple(code):
-    x = ord("A")
+    x = 0
     out = []
     for ch in code:
         if ch == "+":
             x += 1
-            if ord("Z") < x < ord("a"):
-                x = ord("a")
-            elif x > ord("z"):
-                raise InterpreterError("moved past 'z'")
         elif ch == "-":
             x -= 1
-            if ord("Z") < x < ord("a"):
-                x = ord("Z")
-            elif x < ord("A"):
-                raise InterpreterError("moved before 'A'")
-        elif ch == "^":
-            x = ord("A")
-        elif ch == "%":
-            x = ord("a")
+        elif ch == "_":
+            x = 0
         elif ch == "S":
+            if not 0 <= x <= sys.maxunicode:
+                raise InterpreterError("%d isn't a character" % x)
             out.append(chr(x))
     return "".join(out)
 
@@ -151,6 +143,10 @@ def unnecessary(code):
 # ASCII letters only: str.swapcase() changes the length of some letters ("ß" -> "SS"), so it can't be undone.
 SWAP_CASE = str.maketrans(string.ascii_lowercase + string.ascii_uppercase,
                           string.ascii_uppercase + string.ascii_lowercase)
+ATBASH = str.maketrans(string.ascii_lowercase + string.ascii_uppercase,
+                       string.ascii_lowercase[::-1] + string.ascii_uppercase[::-1])
+# Lowercase only: "A" and "a" can't both turn into "4" and still be told apart afterwards.
+LEETSPEAK = str.maketrans("aeiost431057", "431057aeiost")
 
 
 def _shift(text, places):
@@ -172,14 +168,26 @@ def _flip_blocks(text, size):
     return "".join(text[i:i + size][::-1] for i in range(0, len(text), size))
 
 
-def _riffle(text):
-    """Interleaves the first half with the second, like a shuffled deck: abcde -> adbec."""
-    half = (len(text) + 1) // 2
-    return "".join(a + b for a, b in zip_longest(text[:half], text[half:], fillvalue=""))
+def _deal(text, piles):
+    """Deals the characters into `piles` piles like cards, then stacks the piles: abcdefgh, 3 -> adgbehcf."""
+    return "".join(text[pile::piles] for pile in range(piles))
 
 
-def _unriffle(text):
-    return text[0::2] + text[1::2]
+def _undeal(text, piles):
+    order = [i for pile in range(piles) for i in range(pile, len(text), piles)]
+    out = [""] * len(text)
+    for ch, i in zip(text, order):
+        out[i] = ch
+    return "".join(out)
+
+
+def _wave_case(text, every):
+    """Swaps the case of every `every`-th character, starting with the first."""
+    return "".join(ch.translate(SWAP_CASE) if i % every == 0 else ch for i, ch in enumerate(text))
+
+
+def _reverse_words(text):
+    return re.sub(r"\S+", lambda word: word.group()[::-1], text)
 
 
 # (scramble, unscramble, smallest amount). Every pass takes an amount; most ignore it.
@@ -189,34 +197,34 @@ KALLISTI_PASSES = (
     (_shift, lambda text, places: _shift(text, -places), 1),
     (_rotate, lambda text, places: _rotate(text, -places), 1),
     (_flip_blocks, _flip_blocks, 2),
-    (lambda text, _: _riffle(text), lambda text, _: _unriffle(text), 1),
+    (lambda text, _: _undeal(text, 2), lambda text, _: _deal(text, 2), 1),
+    (lambda text, _: text.translate(ATBASH), lambda text, _: text.translate(ATBASH), 1),
+    (lambda text, _: text.translate(LEETSPEAK), lambda text, _: text.translate(LEETSPEAK), 1),
+    (lambda text, _: _reverse_words(text), lambda text, _: _reverse_words(text), 1),
+    (_wave_case, _wave_case, 2),
+    (_deal, _undeal, 3),
 )
 
 
 def kallisti(code, rng=random):
-    """Scrambles the message with 1-6 passes picked at random, then undoes them in reverse order, so it comes back
-    unchanged."""
+    """Scrambles the message with 1-13 passes picked at random, then undoes them in reverse order. Returns the
+    scrambled message and the restored one, which is the message unchanged."""
     done = []
     for _ in range(rng.randint(1, KALLISTI_MAX_PASSES)):
         scramble, unscramble, smallest = rng.choice(KALLISTI_PASSES)
         amount = rng.randint(smallest, KALLISTI_MAX_AMOUNT)
         code = scramble(code, amount)
         done.append((unscramble, amount))
+    scrambled = code
     for unscramble, amount in reversed(done):
         code = unscramble(code, amount)
-    return code
+    return scrambled, code
 
 
 def hq9plus(code, state):
     """`state` holds the shared accumulator and is mutated by '+'."""
     messages = []
-    stopped = False
     for ch in code.lower():
-        if ch not in "hq9+":
-            continue
-        if len(messages) >= HQ9_MAX_MESSAGES:
-            stopped = True
-            break
         if ch == "h":
             messages.append("Hello World! :)")
         elif ch == "q":
@@ -226,10 +234,7 @@ def hq9plus(code, state):
                 messages.append("%s bottles of beer on the wall! %s bottles of beer!" % (bottles, bottles))
                 messages.append("Take one down, and pass it around, %s bottles of beer on the wall!" % (bottles - 1))
             messages.append("....and So On")
-        elif ch == "+":  # pragma: no branch - the loop already skipped everything but h, q, 9 and +
+        elif ch == "+":
             state["accumulator"] = state.get("accumulator", 0) + 1
             messages.append("Accumulator is now at %s" % state["accumulator"])
-    if stopped or len(messages) > HQ9_MAX_MESSAGES:
-        del messages[HQ9_MAX_MESSAGES:]
-        messages.append("Please do not make such big programs. No one likes spam.")
     return messages

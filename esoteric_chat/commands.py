@@ -1,17 +1,10 @@
-import re
 import threading
 
 from . import interpreters as interp
 
-PREFIX = "$"
-# "$name", then everything after one separating whitespace character, exactly as typed.
-COMMAND_RE = re.compile(r"\$(\S*)\s?(.*)", re.S)
-ECHO_LANGUAGE = "kallisti"
 MAX_OUTPUT = interp.MAX_OUTPUT
 OUTPUT_CUT_NOTE = f"\n... (output cut off at {MAX_OUTPUT:,} characters)"
-
-PING_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++++++++++.>+++++++++++.-.-------.<<+++.'
-HELLO_BF = '++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++.>+.+++++++..+++.'
+KALLISTI_LABEL = "Scrambled:\n"
 
 
 def text(value):
@@ -44,13 +37,28 @@ def cap_output(messages):
     return capped
 
 
+def run_kallisti(code):
+    """The labeled scrambled message, then the exact echo. Only the scrambled reply is shortened to keep both under
+    MAX_OUTPUT, and it is left out when there isn't room for its label and the cut-off note."""
+    scrambled, echo = interp.kallisti(code)
+    shown = KALLISTI_LABEL + scrambled
+    room = MAX_OUTPUT - len(echo)
+    if len(shown) > room:
+        if room < len(KALLISTI_LABEL) + len(OUTPUT_CUT_NOTE):
+            return [echo]
+        shown = shown[:room - len(OUTPUT_CUT_NOTE)] + OUTPUT_CUT_NOTE
+    return [shown, echo]
+
+
 # Listed in the order the language picker shows them: alphabetical by name. `run` takes the code and returns the
-# reply text; HQ9+ has no `run` because the engine runs it against the shared accumulator.
+# reply text or a list of replies; HQ9+ has no `run` because the engine runs it against the shared accumulator.
 LANGUAGES = {
     "fivecommand": {
         "name": "5command",
         "color": "purple",
         "run": interp.fivecommand,
+        "intro": "5command - Five symbols run a tape of numbers: + and - move along it, ^ and v change the current "
+                 "number, and p prints it.",
         "examples": [("Print 1337", "^p+^^^p+^^^p+^^^^^^^p")],
         "about": "There are only 5 symbols allowed.",
         "fields": [
@@ -69,8 +77,6 @@ LANGUAGES = {
         "intro": "Brainfart - The Safe-For-Work alternative to BrainF**K",
         "examples": [
             ("Print Hello World!", "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+."),
-            ("$hi: get a program that prints Hello", "$hi"),
-            ("$ping: get a program that prints Pong!", "$ping"),
         ],
         "about": "There are only 8 symbols allowed. All other characters are ignored.",
         "fields": [
@@ -90,23 +96,27 @@ LANGUAGES = {
         "name": "DeadSimple",
         "color": "dark_blue",
         "run": interp.deadsimple,
-        "examples": [("Print AbC", "S%+S^++S")],
-        "about": "There are only 5 symbols allowed. Starts at A.",
+        "intro": "DeadSimple - One number that starts at 0: + and - change it, _ resets it to 0, and S prints it as a "
+                 "character (32 is a space, 65 is A).",
+        "examples": [("Print hello world", "+" * 104 + "S---S+++++++SS+++S_" + "+" * 32 + "S" + "+" * 87
+                      + "S--------S+++S------S--------S")],
+        "about": "There are only 4 symbols allowed. Starts at 0.",
         "fields": [
             ("Esolangs.org Link:", "https://esolangs.org/wiki/DeadSimple"),
-            ("+", "Move up Alphabet"),
-            ("-", "Move down Alphabet"),
-            ("S", "Print"),
-            ("^", "Start at Uppercase A"),
-            ("%", "Start at Lowercase a"),
-            ("Note:", "The original language resets with _. Here ^ and % reset instead, and pick the case"),
+            ("_", "Reset to 0"),
+            ("+", "Increment by 1"),
+            ("-", "Decrement by 1"),
+            ("S", "Print the value as a character (Unicode)"),
         ],
     },
     "hatemath": {
         "name": "Hatemath",
         "color": "red",
         "run": interp.hatemath,
-        "examples": [("Print hi", "<^^^^^^^^]^]")],
+        "intro": "Hatemath - One variable, x, that is nothing, a letter or a number. Change its type, nudge its value "
+                 "and print it with ].",
+        "examples": [("Print hello world", "<" + "^" * 8 + "]///]" + "^" * 7 + "]]^^^]<]" + "^" * 23
+                      + "]////////]^^^]//////]////////]")],
         "about": "There are only 8 symbols, working on 1 variable named x.",
         "fields": [
             ("Esolangs.org Link:", "https://esolangs.org/wiki/Hatemath"),
@@ -123,6 +133,8 @@ LANGUAGES = {
     "hq9plus": {
         "name": "HQ9+",
         "color": "orange",
+        "intro": "HQ9+ - H says hello, Q prints your program, 9 sings 99 Bottles of Beer, and + bumps a counter shared "
+                 "by everyone.",
         "examples": [("Run all four: Hello World, quine, 99 Bottles, add 1", "hq9+")],
         "about": "There are only 4 symbols allowed.",
         "fields": [
@@ -130,14 +142,14 @@ LANGUAGES = {
             ("h", "Prints Hello World"),
             ("q", "Prints Source Code (Quine)"),
             ("9", "Starts 99 Bottles of Beer on the wall"),
-            ("+", "Increments the counter that is always running"),
+            ("+", "Increments a counter shared by everyone using this chat"),
         ],
     },
     "kallisti": {
         "name": "Kallisti",
         "color": "blue",
-        "run": interp.kallisti,
-        "intro": "Kallisti - Everything you send is repeated back exactly, even messages that start with $.",
+        "run": run_kallisti,
+        "intro": "Kallisti - Everything you send comes back scrambled first, then repeated back exactly.",
         "examples": [("Repeat Rule 3: Everything is true", "Everything is true")],
         "about": "<anything> ::= <anything>",
         "fields": [
@@ -180,29 +192,18 @@ class ChatEngine:
         self._hq9_lock = threading.Lock()
 
     def handle(self, message, language=None):
-        stripped = message.lstrip()
-        if stripped.startswith(PREFIX) and language != ECHO_LANGUAGE:
-            name, args = COMMAND_RE.match(stripped).groups()
-            return self.command(name.lower(), args)
         if not language:
-            return [error("Pick a language or send a command.")]
+            return [error("Pick a language.")]
         return self.run_language(language, message)
-
-    def command(self, name, args):
-        if name == "ping":
-            return [text(PING_BF)]
-        if name in ("hello", "hi"):
-            return [text(HELLO_BF)]
-        if name in LANGUAGES:
-            return self.run_language(name, args)
-        return [error("Unknown command %s%s." % (PREFIX, name))]
 
     def run_language(self, language, code):
         meta = LANGUAGES.get(language)
         if meta is None:
             return [error("Unknown language: %s" % language)]
         try:
-            replies = [meta["run"](code)] if "run" in meta else self.run_hq9plus(code)
+            replies = meta["run"](code) if "run" in meta else self.run_hq9plus(code)
+            if isinstance(replies, str):
+                replies = [replies]
             return [text(m) for m in cap_output(replies)]
         except interp.InterpreterError as e:
             return [error("Invalid %s Command: %s" % (meta["name"], e))]
